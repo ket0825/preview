@@ -6,6 +6,7 @@ from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+# from seleniumwire import webdriver
 
 from log import Logger
 log = Logger.get_instance()
@@ -39,7 +40,6 @@ class Driver:
     def __init__(self, headless=True) -> None:
         # TODO: start from log requests.
         # make chrome log requests
-        # capabilities = DesiredCapabilities.CHROME
         # capabilities["loggingPrefs"] = {"performance": "ALL"}  # newer: goog:loggingPrefs
         options, capa = self.set_options(headless)
         self.driver = webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()),
@@ -68,11 +68,13 @@ class Driver:
             "webrtc.nonproxied_udp_enabled" : False # prevent IP leak issues.
         }
         options.add_experimental_option("excludeSwitches", ["enable-automation"]) # automation message exclude.
-        options.add_experimental_option('useAutomationExtension', False) 
+        # options.add_experimental_option('useAutomationExtension', False) 
+        options.add_experimental_option("detach", True)
         options.add_experimental_option("prefs", preferences)    # Add Preferences
         capa = DesiredCapabilities.CHROME
-        options.set_capability("pageLoadStrategy", 'none') # does not wait loading.
+        # options.set_capability("pageLoadStrategy", 'none') # does not wait loading.
         options.set_capability("acceptInsecureCerts", True)
+        options.set_capability("goog:loggingPrefs", {'performance': 'ALL'}) # 
         # capa["pageLoadStrategy"] = "none" # does not wait loading.
         # capa['acceptInsecureCerts'] = True
         # capa['acceptSslCerts'] = True
@@ -106,6 +108,7 @@ class Driver:
         WebDriverWait(self.driver, time).until(EC.element_to_be_clickable((By.CSS_SELECTOR, class_name)))
     
     def click(self):
+
         self.driver.click()
     
     # def find_element_by_xpath(self, element, element_name):
