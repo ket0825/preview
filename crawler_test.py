@@ -62,8 +62,11 @@ def test():
     #     print(f"Error: {error}")
 
     naver_shopping_driver.release()
+    print("END")
 
 
 if __name__ == '__main__':
     test()
-    
+
+
+
