@@ -1,6 +1,6 @@
 #stdlib
 import json
-import time
+import datetime
 # 3rd party lib.
 from driver.driver import Driver
 from selenium.webdriver.common.by import By
@@ -29,15 +29,27 @@ def test():
     naver_shopping_driver.get_url_by_category(category)
     naver_shopping_driver.wait(5)
     
-    a_tags = naver_shopping_driver.driver.find_elements(By.XPATH, "//div[contains(@class, 'product_title_')]/a") # substring match.
+    page_links_dict = {}
     
-    for a_tag in a_tags:
-        log.info(f"link: {a_tag.get_attribute('href')}")
+    for _ in range(5): # 1페이지부터 5페이지까지임.
+        page = naver_shopping_driver.page
+        a_tags = naver_shopping_driver.driver.find_elements(By.XPATH, "//div[contains(@class, 'product_title_')]/a") # substring match.
+        
+        hrefs = []
+        for a_tag in a_tags:
+            link = a_tag.get_attribute('href')
+            # log.info(f"link: {a_tag.get_attribute('href')}")
+            hrefs.append(link)
+        
+        page_links_dict[page] = hrefs if hrefs else ["END"]
+        naver_shopping_driver.go_next_page()
+    
+    current_time = datetime.datetime.now().strftime('%Y%m%d_%Hh%Mm')
 
-    naver_shopping_driver.go_next_page()
-    a_tags = naver_shopping_driver.driver.find_elements(By.XPATH, "//div[contains(@class, 'product_title_')]/a[@href]") # substring match.
-    for a_tag in a_tags:
-        log.info(f"link: {a_tag.get_attribute('href')}")
+    with open(f'./api_call/{current_time}_{category}_product_link.json', 'w', encoding='utf-8-sig') as json_file:
+        json.dump(page_links_dict, json_file, ensure_ascii=False)
+
+
     
     naver_shopping_driver.release()
 
