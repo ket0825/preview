@@ -6,7 +6,18 @@ from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-# from seleniumwire import webdriver
+from selenium.webdriver.remote.webelement import WebElement
+from selenium.webdriver import ActionChains
+from random_user_agent.user_agent import UserAgent
+from random_user_agent.params import SoftwareName, OperatingSystem, SoftwareEngine, HardwareType, Popularity, SoftwareType
+
+import random
+
+#TODO: proxy ip list need.
+"""
+프록시 서버 필요함... 아래 링크 참조.
+https://jaehyojjang.dev/python/free-proxy-server/
+"""
 
 from log import Logger
 log = Logger.get_instance()
@@ -41,23 +52,44 @@ class Driver:
         # TODO: start from log requests.
         # make chrome log requests
         # capabilities["loggingPrefs"] = {"performance": "ALL"}  # newer: goog:loggingPrefs
-        options, capa = self.set_options(headless)
+        
+        options = self.set_options(headless)
         self.driver = webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()),
                                     #    desired_capabilities=capa,
                                        options=options)
         self.headless = headless
     
-    def set_options(self, headless=False) -> None:
+    def set_options(self, headless=False) -> Options:
         options = Options()
         if headless:
             options.add_argument("--headless=new")
+               
+        user_agent_rotator = UserAgent(
+            hardware_types=HardwareType.COMPUTER.value,
+            software_types=SoftwareType.WEB_BROWSER.value,
+            software_names=SoftwareName.CHROME.value, 
+            operating_systems=OperatingSystem.WINDOWS.value,
+            popularity=Popularity.POPULAR.value,
+            limit=1000
+            )
+        # # Get list of user agents.
+        user_agents = user_agent_rotator.get_user_agents()
+        random.shuffle(user_agents)
+        user_agent = ""
+        for ua in user_agents:
+            if "Windows NT 10.0" in ua['user_agent']:
+                user_agent = ua['user_agent']
+                break
 
+        log.info(f"user_agent: {user_agent}")
+        options.add_argument(f'user-agent={user_agent}')
         options.add_argument('--mute-audio')
         options.add_argument("--disable-gpu") 
         options.add_argument("--disable-infobars")
         options.add_argument("--disable-extensions")
         options.add_argument('--disable-dev-shm-usage')
         options.add_argument('--ignore-certificate-errors')
+        options.add_argument('--disable-cookies')
         options.add_argument("--no-sandbox")
         # options.add_argument("--blink-settings=imagesEnabled=false") # Image Disable
         options.add_argument('--disable-blink-features=AutomationControlled')    # Automation detection disable
@@ -65,20 +97,21 @@ class Driver:
             "profile.default_content_setting_values.notifications": 2, # prevent web cookie notification
             "webrtc.ip_handling_policy" : "disable_non_proxied_udp", # prevent IP leak issues.
             "webrtc.multiple_routes_enabled": False, # prevent IP leak issues.
-            "webrtc.nonproxied_udp_enabled" : False # prevent IP leak issues.
+            "webrtc.nonproxied_udp_enabled" : False, # prevent IP leak issues.
+            # "profile.default_content_setting_values.cookies": 2
         }
         options.add_experimental_option("excludeSwitches", ["enable-automation"]) # automation message exclude.
         # options.add_experimental_option('useAutomationExtension', False) 
         options.add_experimental_option("detach", True)
         options.add_experimental_option("prefs", preferences)    # Add Preferences
-        capa = DesiredCapabilities.CHROME
+        # capa = DesiredCapabilities.CHROME
         # options.set_capability("pageLoadStrategy", 'none') # does not wait loading.
         options.set_capability("acceptInsecureCerts", True)
         options.set_capability("goog:loggingPrefs", {'performance': 'ALL'}) # 
         # capa["pageLoadStrategy"] = "none" # does not wait loading.
         # capa['acceptInsecureCerts'] = True
         # capa['acceptSslCerts'] = True
-        return options, capa
+        return options
 
     def get(self, url:str) -> None:
         self.driver.get(url)
@@ -107,6 +140,14 @@ class Driver:
     def wait_until_by_css_selector(self, time:float, class_name:str) -> None:
         WebDriverWait(self.driver, time).until(EC.element_to_be_clickable((By.CSS_SELECTOR, class_name)))
     
+    def move_to_element(self, element:WebElement):
+        actions = ActionChains(self.driver)
+        actions.move_to_element(element).perform()
+        
+
+    def wait_until_by_xpath(self, time:float, value:str) -> WebElement:            
+        return WebDriverWait(self.driver, time).until(EC.element_to_be_clickable((By.XPATH, value)))
+    
     def click(self):
 
         self.driver.click()
@@ -122,3 +163,7 @@ class Driver:
     def release(self):
         self.driver.quit()
         print("DRIVER CLOSING...")
+
+
+if __name__ == '__main__':
+    driver = Driver()
