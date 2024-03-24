@@ -32,9 +32,12 @@ def test():
     page_links_dict = {}
     
     for _ in range(5): # 1페이지부터 5페이지까지임.
+        footer = naver_shopping_driver.wait_until_by_xpath(3, "//div[contains(@class, 'footer_info')]")
+        naver_shopping_driver.move_to_element(element=footer)
         page = naver_shopping_driver.page
-        a_tags = naver_shopping_driver.driver.find_elements(By.XPATH, "//div[contains(@class, 'product_title_')]/a") # substring match.
         
+        # 광고는 자동으로 걸러짐.
+        a_tags = naver_shopping_driver.driver.find_elements(By.XPATH, "//div[contains(@class, 'product_title_')]/a") # substring match.
         hrefs = []
         for a_tag in a_tags:
             link = a_tag.get_attribute('href')
@@ -48,6 +51,7 @@ def test():
 
     with open(f'./api_call/{current_time}_{category}_product_link.json', 'w', encoding='utf-8-sig') as json_file:
         json.dump(page_links_dict, json_file, ensure_ascii=False)
+        log.info(f"[SUCCESS] Success at {category}")
 
 
     
