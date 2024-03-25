@@ -48,41 +48,40 @@ https://www.geeksforgeeks.org/find_element_by_xpath-driver-method-selenium-pytho
 # 느긋하게 하려면 options.set_capability("pageLoadStrategy"... 이 부분 주석처리.
 class Driver:
     
-    def __init__(self, headless=True) -> None:
+    def __init__(self, headless=True, active_user_agent=False) -> None:
         # TODO: start from log requests.
         # make chrome log requests
         # capabilities["loggingPrefs"] = {"performance": "ALL"}  # newer: goog:loggingPrefs
         
-        options = self.set_options(headless)
+        options = self.set_options(headless, active_user_agent)
         self.driver = webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()),
-                                    #    desired_capabilities=capa,
                                        options=options)
         self.headless = headless
     
-    def set_options(self, headless=False) -> Options:
+    def set_options(self, headless=False, active_user_agent=False) -> Options:
         options = Options()
         if headless:
             options.add_argument("--headless=new")
-               
-        user_agent_rotator = UserAgent(
-            hardware_types=HardwareType.COMPUTER.value,
-            software_types=SoftwareType.WEB_BROWSER.value,
-            software_names=SoftwareName.CHROME.value, 
-            operating_systems=OperatingSystem.WINDOWS.value,
-            popularity=Popularity.POPULAR.value,
-            limit=1000
-            )
-        # # Get list of user agents.
-        user_agents = user_agent_rotator.get_user_agents()
-        random.shuffle(user_agents)
-        user_agent = ""
-        for ua in user_agents:
-            if "Windows NT 10.0" in ua['user_agent']:
-                user_agent = ua['user_agent']
-                break
+        if active_user_agent:               
+            user_agent_rotator = UserAgent(
+                hardware_types=HardwareType.COMPUTER.value,
+                software_types=SoftwareType.WEB_BROWSER.value,
+                software_names=SoftwareName.CHROME.value, 
+                operating_systems=OperatingSystem.WINDOWS.value,
+                popularity=Popularity.POPULAR.value,
+                limit=1000
+                )
+            # # Get list of user agents.
+            user_agents = user_agent_rotator.get_user_agents()
+            random.shuffle(user_agents)
+            user_agent = ""
+            for ua in user_agents:
+                if "Windows NT 10.0" in ua['user_agent']:
+                    user_agent = ua['user_agent']
+                    break
 
-        log.info(f"user_agent: {user_agent}")
-        options.add_argument(f'user-agent={user_agent}')
+            log.info(f"user_agent: {user_agent}")
+            options.add_argument(f'user-agent={user_agent}')
         options.add_argument('--mute-audio')
         options.add_argument("--disable-gpu") 
         options.add_argument("--disable-infobars")
