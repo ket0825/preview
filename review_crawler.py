@@ -2,6 +2,7 @@
 import json
 import time
 import random
+import datetime
 # 3rd party lib.
 from driver.driver import Driver
 from selenium.webdriver.common.by import By
@@ -20,7 +21,7 @@ def test():
     """https://selenium-python.readthedocs.io/locating-elements.html"""
 
     # 원래는 크롤링한 사이트 링크들.
-    naver_shopping_driver.get("https://search.shopping.naver.com/catalog/42617437619?&NaPm=ct%3Dlu1a619c%7Cci%3D9a989f171d581b33e94796aa84f47af8e526ac37%7Ctr%3Dslcc%7Csn%3D95694%7Chk%3Db1354d632187303e9f2c56687a8afd0ad88ef9b0")
+    naver_shopping_driver.get("https://search.shopping.naver.com/catalog/42620674619?&NaPm=ct%3Dlu5s4zm0%7Cci%3D06b08170e3978844cb0e1a36d5f14425d8b3af60%7Ctr%3Dslcc%7Csn%3D95694%7Chk%3D4900f70e51f93f6ecb7299fa4ed84acea8bd385c")
     # 디알고 헤드셋.
     # naver_shopping_driver.get("https://search.shopping.naver.com/catalog/36974003618?adId=nad-a001-02-000000223025435&channel=nshop.npla&cat_id=%EB%94%94%EC%A7%80%ED%84%B8/%EA%B0%80%EC%A0%84&NaPm=ct%3Dlu2l3ulc%7Cci%3D0zW0003ypdPztN%5FoFfjw%7Ctr%3Dpla%7Chk%3Dc6b52bbfde6b3967102cd5b772f10fb97a2d3356&cid=0zW0003ypdPztN_oFfjw")
 
@@ -85,12 +86,14 @@ def test():
             log.info(f"Caught {resp_url}")        
             reviews = json.loads(naver_shopping_driver.driver.execute_cdp_cmd("Network.getResponseBody", {"requestId": request_id})['body'])['reviews']
             total_reviews.extend(reviews) # extend
-            # 원래는 reviews 할 때 마다 api call로 db에 넣을 예정임. 지금은 임시.
+            # 원래는 reviews 할 때 마다 api call로 db에 넣을 예정임. 지금은 임시로 json으로 나옴.
     
     # for review in total_reviews:
     #     log.info(review)            
-    
-    with open('review.json', 'w', encoding='utf-8-sig') as json_file:
+            
+    current_time = datetime.datetime.now().strftime('%Y%m%d_%Hh%Mm')
+
+    with open(f'./{current_time}_review.json', 'w', encoding='utf-8-sig') as json_file:
         log.info("Review data from JSON file completed.")
         json.dump(total_reviews, json_file, ensure_ascii=False)
 
