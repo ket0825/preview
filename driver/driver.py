@@ -119,6 +119,9 @@ class Driver:
         self.page = 1
         if category == 'smartwatch':
             self.driver.get(f"https://search.shopping.naver.com/search/category/100005046?adQuery&catId=50000262&origQuery&pagingIndex={self.page}&pagingSize=40&productSet=model&query&sort=rel&spec=M10016843%7CM10664435&timestamp=&viewType=list")
+        elif category == 'extra_battery':
+            self.driver.get(f"https://search.shopping.naver.com/search/category/100005102?adQuery&catId=50001379%2050001377&origQuery&pagingIndex=1&pagingSize=40&productSet=model&query&sort=rel&timestamp=&viewType=list")
+
     
     def get_current_url(self):
         return self.driver.current_url
