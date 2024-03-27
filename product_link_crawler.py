@@ -5,13 +5,28 @@ import datetime
 from driver.driver import Driver
 from selenium.webdriver.common.by import By
 from selenium.common.exceptions import TimeoutException
-
+from selenium.webdriver.remote.webelement import WebElement
 
 # custom lib.
 from log import Logger 
 log = Logger.get_instance()
 
-xhr_pattern = r"XMLHttpRequest"
+
+def price_formatter(price_element: WebElement) -> str:
+    return price_element.text.replace(",", "").replace("원", "")
+
+def grade_formatter(grade_element: WebElement) -> str:
+    grade_str = ""
+    try:
+        grade_blind = grade_element.find_element(By.XPATH, ".//span[@class='blind']")
+        grade_str = grade_element.text.replace("\n", "").replace(grade_blind.text, "")
+    except:
+        grade_str =  grade_element.text
+    
+    return grade_str
+
+def review_count_formatter(review_count: WebElement) -> str:
+    return review_count.text.replace(",", "").replace("\n", "").replace('(', '').replace(')', '')
 
 def test():
     # category = 'smartwatch'
@@ -31,40 +46,62 @@ def test():
     naver_shopping_driver.get_url_by_category(category)
     naver_shopping_driver.wait(5)
     
-    page_links_dict = {category: naver_shopping_driver.driver.current_url}
-    page_links_dict['start_page'] = naver_shopping_driver.page
+    product_dict = {
+                        "category": category,
+                        'url': naver_shopping_driver.driver.current_url,
+                        }
     
+    product_dict['start_page'] = naver_shopping_driver.page
+    items = []
     for p in range(5): # 1페이지부터 5페이지까지임.
         try:
-            footer = naver_shopping_driver.wait_until_by_xpath(3, "//div[contains(@class, 'footer_info')]")
+            footer = naver_shopping_driver.wait_until_by_xpath(3, ".//div[contains(@class, 'footer_info')]")
             naver_shopping_driver.move_to_element(element=footer)
-            page = naver_shopping_driver.page
             
             # 광고는 자동으로 걸러짐.
-            a_tags = naver_shopping_driver.driver.find_elements(By.XPATH, "//div[contains(@class, 'product_title_')]/a") # substring match.
-            hrefs = []
-            for a_tag in a_tags:
-                link = a_tag.get_attribute('href')
-                # log.info(f"link: {a_tag.get_attribute('href')}")
-                hrefs.append(link)
-            
-            page_links_dict[page] = hrefs if hrefs else ["END"]
+            product_items = naver_shopping_driver.driver.find_elements(By.XPATH, ".//div[contains(@class, 'product_item_')]") # substring match.        
+            for item in product_items:
+                item_dict = {
+                                "url" : "",
+                                "grade": "",
+                                'name': "",
+                                'lowest_price': "",
+                                'review_count': ""
+                               }
+                # 가격 추출.
+                price = item.find_element(By.XPATH, ".//span[contains(@class, 'price_num_')]")
+                item_dict['lowest_price'] = price_formatter(price)
+                # 별점 추출.
+                grade = item.find_element(By.XPATH, ".//span[contains(@class, 'product_grade_')]")
+                item_dict['grade'] = grade_formatter(grade)
+                # 리뷰 개수 따오기.
+                grade_num = item.find_element(By.XPATH, ".//div[contains(@class, 'product_etc_')]/a/em[contains(@class, 'product_num')]")
+                # grade_num = product_etc.find_element(By.XPATH, ".//em[contains(@class, 'product_num')]")
+                item_dict['review_count'] = review_count_formatter(grade_num)
+
+                # 링크와 제품명 추출.
+                a_tag = item.find_element(By.XPATH, ".//div[contains(@class, 'product_title_')]/a")
+                item_dict['url'] = a_tag.get_attribute('href')
+                item_dict['name'] = a_tag.get_attribute('title')
+
+                items.append(item_dict)
 
             if p < 4:
                 naver_shopping_driver.go_next_page()
                 
         except TimeoutException as e:
-            log.info(f"[ERROR] Time out error occured: {e}")
+            log.info(f"[ERROR] Time out error occured: Couldn't found footer or last page.\n\
+                     Error log: {e}")
         except Exception as e:
-            log.info(f"[ERROR] Unknownrror occured: {e}")
-        
-    page_links_dict['end_page'] = naver_shopping_driver.page
+            log.info(f"[ERROR] Error log: {e}")
+
+    product_dict['end_page'] = naver_shopping_driver.page
+    product_dict['items'] = items
 
     current_time = datetime.datetime.now().strftime('%Y%m%d_%Hh%Mm')
     with open(f'./api_call/{current_time}_{category}_product_link.json', 'w', encoding='utf-8-sig') as json_file:
-        json.dump(page_links_dict, json_file, ensure_ascii=False)
+        json.dump(product_dict, json_file, ensure_ascii=False)
         log.info(f"[SUCCESS] Success at {category}")
-
 
     
     naver_shopping_driver.release()
