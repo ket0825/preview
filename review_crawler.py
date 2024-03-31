@@ -193,7 +193,7 @@ def test():
         except:
             log.warning("[WARNING] No see more button.")
         
-        fetch_product_details(naver_shopping_driver)
+        # fetch_product_details(naver_shopping_driver)
             
         spec = fetch_spec(naver_shopping_driver)            
         log.info(f"[INFO] Spec: {spec}")

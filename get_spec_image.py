@@ -150,8 +150,8 @@ def fetch_product_details(driver:Driver, name:str):
 
     except NoSuchElementException:
         pass
-    except Exception as e:
-        log.info(f"[ERROR] Can't get url. Error: {e}")
+    # except Exception as e:
+    #     log.info(f"[ERROR] Can't get url. Error: {e}")
         
     # 일반 img spec 존재 시.
     try:
@@ -174,8 +174,8 @@ def fetch_product_details(driver:Driver, name:str):
 
     except NoSuchElementException:
         pass
-    except Exception as e:
-        log.info(f"[ERROR] Can't get url. Error: {e}")
+    # except Exception as e:
+    #     log.info(f"[ERROR] Can't get url. Error: {e}")
 
                      
     # 위치 파일 주기.
@@ -291,6 +291,7 @@ def test():
             sort_by_recent = naver_shopping_driver.wait_until_by_xpath(3, ".//a[contains(@class, 'filter_sort') and contains(@data-nclick, 'rec')]") # recent라는 뜻임.
         except Exception as e:
             log.warning(f"[WARNING] No Reviews in {name}. Go to next product.")
+            naver_shopping_driver.release()
             continue
 
         naver_shopping_driver.move_to_element(element=product_details)
