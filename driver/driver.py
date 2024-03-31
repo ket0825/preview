@@ -48,17 +48,17 @@ https://www.geeksforgeeks.org/find_element_by_xpath-driver-method-selenium-pytho
 # 느긋하게 하려면 options.set_capability("pageLoadStrategy"... 이 부분 주석처리.
 class Driver:
     
-    def __init__(self, headless=True, active_user_agent=False) -> None:
+    def __init__(self, headless=True, active_user_agent=False, get_log=True) -> None:
         # TODO: start from log requests.
         # make chrome log requests
         # capabilities["loggingPrefs"] = {"performance": "ALL"}  # newer: goog:loggingPrefs
         
-        options = self.set_options(headless, active_user_agent)
+        options = self.set_options(headless, active_user_agent, get_log)
         self.driver = webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()),
                                        options=options)
         self.headless = headless
     
-    def set_options(self, headless=False, active_user_agent=False) -> Options:
+    def set_options(self, headless=False, active_user_agent=False, get_log=True) -> Options:
         options = Options()
         if headless:
             options.add_argument("--headless=new")
@@ -81,7 +81,8 @@ class Driver:
                     break
 
             log.info(f"user_agent: {user_agent}")
-            options.add_argument(f'user-agent={user_agent}')
+            options.add_argument(f'user-agent={user_agent}')     
+
         options.add_argument('--mute-audio')
         options.add_argument("--disable-gpu") 
         options.add_argument("--disable-infobars")
@@ -105,8 +106,9 @@ class Driver:
         options.add_experimental_option("prefs", preferences)    # Add Preferences
         # capa = DesiredCapabilities.CHROME
         # options.set_capability("pageLoadStrategy", 'none') # does not wait loading.
+        if get_log:
+            options.set_capability("goog:loggingPrefs", {'performance': 'ALL'})
         options.set_capability("acceptInsecureCerts", True)
-        options.set_capability("goog:loggingPrefs", {'performance': 'ALL'}) # 
         # capa["pageLoadStrategy"] = "none" # does not wait loading.
         # capa['acceptInsecureCerts'] = True
         # capa['acceptSslCerts'] = True
