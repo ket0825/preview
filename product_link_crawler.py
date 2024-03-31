@@ -12,6 +12,10 @@ from log import Logger
 log = Logger.get_instance()
 
 
+# 이후 환경 변수로 수정.
+PAGE_NUM = 5
+
+
 def price_formatter(price_element: WebElement) -> str:
     return price_element.text.replace(",", "").replace("원", "")
 
@@ -53,7 +57,7 @@ def test():
     
     product_dict['start_page'] = naver_shopping_driver.page
     items = []
-    for p in range(5): # 1페이지부터 5페이지까지임.
+    for p in range(PAGE_NUM): # 1페이지부터 5페이지까지임.
         try:
             footer = naver_shopping_driver.wait_until_by_xpath(3, ".//div[contains(@class, 'footer_info')]")
             naver_shopping_driver.move_to_element(element=footer)
@@ -66,27 +70,41 @@ def test():
                                 "grade": "",
                                 'name': "",
                                 'lowest_price': "",
-                                'review_count': ""
+                                'review_count': "",
+                                'brand': "", # 차후 넣을 예정.
+                                'maker': "", # 차후 넣을 예정.
                                }
-                # 가격 추출.
-                price = item.find_element(By.XPATH, ".//span[contains(@class, 'price_num_')]")
-                item_dict['lowest_price'] = price_formatter(price)
-                # 별점 추출.
-                grade = item.find_element(By.XPATH, ".//span[contains(@class, 'product_grade_')]")
-                item_dict['grade'] = grade_formatter(grade)
-                # 리뷰 개수 따오기.
-                grade_num = item.find_element(By.XPATH, ".//div[contains(@class, 'product_etc_')]/a/em[contains(@class, 'product_num')]")
-                # grade_num = product_etc.find_element(By.XPATH, ".//em[contains(@class, 'product_num')]")
-                item_dict['review_count'] = review_count_formatter(grade_num)
-
                 # 링크와 제품명 추출.
-                a_tag = item.find_element(By.XPATH, ".//div[contains(@class, 'product_title_')]/a")
-                item_dict['url'] = a_tag.get_attribute('href')
-                item_dict['name'] = a_tag.get_attribute('title')
+                try:
+                    a_tag = item.find_element(By.XPATH, ".//div[contains(@class, 'product_title_')]/a")
+                    item_dict['url'] = a_tag.get_attribute('href')
+                    item_dict['name'] = a_tag.get_attribute('title')
+                    items.append(item_dict)
+                except Exception as e:
+                    log.error(f'[ERROR] Could not catch product url and name.')
 
-                items.append(item_dict)
+                # 가격 추출.
+                try:
+                    lowest_price = item.find_element(By.XPATH, ".//span[contains(@class, 'price_num_')]")
+                    item_dict['lowest_price'] = price_formatter(lowest_price)
+                # 별점 추출.
+                except Exception as e:
+                    log.error(f'[ERROR] Could not catch price at {item_dict["name"]}')
+                try:
+                    grade = item.find_element(By.XPATH, ".//span[contains(@class, 'product_grade_')]")
+                    item_dict['grade'] = grade_formatter(grade)
+                except Exception as e:
+                    log.warning(f'[WARNING] Could not catch grade at {item_dict["name"]}')
+                # 리뷰 개수 따오기.
+                try:
+                    grade_num = item.find_element(By.XPATH, ".//div[contains(@class, 'product_etc_')]/a/em[contains(@class, 'product_num')]")
+                    # grade_num = product_etc.find_element(By.XPATH, ".//em[contains(@class, 'product_num')]")
+                    item_dict['review_count'] = review_count_formatter(grade_num)
+                except Exception as e:
+                    log.warning(f'[WARNING] Could not catch grade_num at {item_dict["name"]}')
 
-            if p < 4:
+                
+            if p < PAGE_NUM - 1:
                 naver_shopping_driver.go_next_page()
                 
         except TimeoutException as e:

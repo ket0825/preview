@@ -118,9 +118,11 @@ class Driver:
     def get_url_by_category(self, category:str) -> None:
         self.page = 1
         if category == 'smartwatch':
-            self.driver.get(f"https://search.shopping.naver.com/search/category/100005046?adQuery&catId=50000262&origQuery&pagingIndex={self.page}&pagingSize=40&productSet=model&query&sort=rel&spec=M10016843%7CM10664435&timestamp=&viewType=list")
+            self.driver.get(f"https://search.shopping.naver.com/search/category/100005046?adQuery&catId=50000262&origQuery&pagingIndex=1&pagingSize=40&productSet=model&query&sort=rel&spec=M10016843%7CM10664435&timestamp=&viewType=list")
         elif category == 'extra_battery':
-            self.driver.get(f"https://search.shopping.naver.com/search/category/100005102?adQuery&catId=50001379%2050001377&origQuery&pagingIndex=1&pagingSize=40&productSet=model&query&sort=rel&timestamp=&viewType=list")
+            self.driver.get(f"https://search.shopping.naver.com/search/category/100005088?adQuery&catId=50001380&origQuery&pagingIndex=1&pagingSize=40&productSet=model&query&sort=rel&timestamp=&viewType=list")
+        elif category == 'keyboard':
+            self.driver.get(f"https://search.shopping.naver.com/search/category/100005369?adQuery&catId=50001204&origQuery&pagingIndex=1&pagingSize=40&productSet=model&query&sort=rel&timestamp=&viewType=list")
 
     
     def get_current_url(self):
@@ -150,9 +152,13 @@ class Driver:
     def wait_until_by_xpath(self, time:float, value:str) -> WebElement:            
         return WebDriverWait(self.driver, time).until(EC.element_to_be_clickable((By.XPATH, value)))
     
-    def click(self):
-
-        self.driver.click()
+    def screenshot_whole(self, path:str): # 미완성.
+        """
+        제품정보 섹션이 아닌, 전체 캡처 =>  OCR 돌리면 오래걸림.
+        """
+        # S = lambda X: self.driver.execute_script('return document.body.parentNode.scroll'+X)
+        # self.driver.set_window_size(S('Width'), S('Height'))
+        # img_b64 =self.driver.find_element(By.TAG_NAME, 'body').screenshot(path)
     
     # def find_element_by_xpath(self, element, element_name):
     #     """

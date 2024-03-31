@@ -12,4 +12,4 @@ api_call/*
 __pycache__/
 venv/
 *.pyo
-
+*.zip
