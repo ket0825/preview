@@ -17,13 +17,16 @@ import random
 import datetime
 from io import BytesIO
 import re
+
 # 3rd party lib.
+import requests
 from driver.driver import Driver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webelement import WebElement
 from bs4 import BeautifulSoup
 from PIL import Image
 import numpy
+from selenium.common.exceptions import NoSuchElementException
 
 
 
@@ -81,14 +84,21 @@ def fetch_spec(driver:Driver):
 
 
 def fetch_product_details(driver:Driver, name:str):
-    # TODO: # 사진 캡처하기. (단, OCR 인식 후에 제품정보 ~ 본 컨텐츠는... 까지 y 좌표 어긋나면 다 주기.)
+    # TODO: # 사진 가져오고, 이후 병렬처리 (multiprocessing)
     spec_info_section = driver.driver.find_element(By.XPATH, ".//h3[contains(@class, 'specInfo_section_title__')]")
     driver.move_to_element(element=spec_info_section)
+    page_location_dict = {
+        'product_detail': {},
+        "spec_info_provide": {},
+        'total': {},
+        'naver_spec': {}, # 둘 중 하나임.
+        "export_spec": {}
+    }
 
-    page_location_dict = {}
     # 스펙 부분 위치.
     product_detail = driver.driver.find_element(By.ID, "section_spec")
     page_location_dict['product_detail'] = product_detail.location
+    
     # 본 컨텐츠는 ... 부분 위치.
     try:
         imageSpecInfo_provide = driver.wait_until_by_xpath(3, ".//p[contains(@class, 'imageSpecInfo_provide_')]")
@@ -96,21 +106,97 @@ def fetch_product_details(driver:Driver, name:str):
     except:
         SpecInfo_provide = driver.wait_until_by_xpath(3, ".//p[contains(@class, 'specInfo_provide_')]")
         page_location_dict['spec_info_provide'] = SpecInfo_provide.location
-        
-
+    
     # 전체 페이지 높이 가져오기
     total_height = driver.driver.execute_script("return Math.max(document.documentElement.scrollHeight, document.body.scrollHeight);")
     # 전체 페이지 너비 가져오기
     total_width = driver.driver.execute_script("return Math.max(document.documentElement.scrollWidth, document.body.scrollWidth);")
     page_location_dict['total'] = {'x': total_width, 'y': total_height}
 
+    # 일반적인 이미지 스펙 추출 가능한지 확인.
+    try:
+        driver.driver.find_element(By.XPATH, ".//div[contains(@class, 'imageSpecInfo_export_')]")
+    except:
+        log.info(f"[INFO] No export spec at here.")
+        tables = driver.driver.find_elements(By.XPATH, ".//div[contains(@class, 'attribute_product_attribute_')]/table")
+        for table in tables:
+            table_rows = table.find_elements(By.XPATH, ".//tr")
+            for row in table_rows:
+                keys = row.find_elements(By.XPATH, ".//th")
+                vals = row.find_elements(By.XPATH, ".//td")
+                for key, val in zip(keys, vals):
+                    page_location_dict['naver_spec'][key.text] = {'text': val.text, 
+                                                                   'location': val.location
+                                                                   }
+
+    # brand content banner 존재 시.
+    try:
+        img_brand_content_exports = driver.driver.find_elements(By.XPATH, ".//div[contains(@class, 'brandContent_export_')]/img")
+        for idx, img_brand_content_export in enumerate(img_brand_content_exports):
+            page_location_dict['export_spec'][f'img_brand_content_export_{idx+1}'] = img_brand_content_export.location
+            src = img_brand_content_export.get_attribute('src')
+
+             # .gif, 동영상 등의 확장자를 막기 위함.
+            if '.jpg' not in src or '.png' not in src:
+                continue
+
+            res = requests.get(img_brand_content_export.get_attribute('src'))        
+            img = Image.open(BytesIO(res.content))
+            img.save(f'./product_images/{name}_{idx+1}_banner.jpg')
+        
+            # 아래와 같이 높이 부분만 알면 잘라서 OCR하면 된다.
+            img_height = img_brand_content_export.get_attribute('height')
+            log.info(f"[INFO] img_height: {img_height}")
+
+    except NoSuchElementException:
+        pass
+    except Exception as e:
+        log.info(f"[ERROR] Can't get url. Error: {e}")
+        
+    # 일반 img spec 존재 시.
+    try:
+        image_spec_info_product_imgs = driver.driver.find_elements(By.XPATH, ".//p[contains(@id, 'detailFromBrand')]/img")
+        for idx, image_spec_info_product_img in enumerate(image_spec_info_product_imgs):
+            page_location_dict['export_spec'][f'image_spec_info_product_img_{idx+1}'] = image_spec_info_product_img.location
+            src = image_spec_info_product_img.get_attribute('src')
+            
+            # .gif, 동영상 등의 확장자를 막기 위함.
+            if '.jpg' not in src and '.png' not in src:
+                log.warning("[WARNING] Only jpg or png.")
+                continue
+
+            res = requests.get(src)        
+            img = Image.open(BytesIO(res.content))
+            img.save(f'./product_images/{name}_{idx+1}.jpg')
+            # 이후 OCR 처리. 아래와 같이 높이 부분만 알면 잘라서 OCR하면 된다.
+            img_height = image_spec_info_product_img.get_attribute('height') 
+            log.info(f"[INFO] img_height: {img_height}")
+
+    except NoSuchElementException:
+        pass
+    except Exception as e:
+        log.info(f"[ERROR] Can't get url. Error: {e}")
+
+                     
+    # 위치 파일 주기.
     with open(f'./product_detail_location/{name}_product_detail.json', 'w', encoding='utf-8-sig') as json_file:
         json.dump(page_location_dict, json_file, ensure_ascii=False)
+
+    
+
+    return
+    # 이 아래는 전부 캡처할 경우임.
+    # 부드럽게 스크롤 for lazy loading.
+    driver.move_to_element(element=spec_info_section)
+    driver.driver.execute_script("window.scrollTo({  top: arguments[0],  behavior: 'smooth'});", total_height)
+    time.sleep(3)
+    driver.move_to_element(element=spec_info_section)
 
 
     # 제품정보 섹션 캡처.
     S = lambda X: driver.driver.execute_script('return document.getElementById("section_spec").'+X)
     driver.driver.set_window_size(S('clientWidth'), S('clientHeight')+100)
+    time.sleep(page_location_dict['spec_info_provide']['y'] - page_location_dict['product_detail']['y'] // 10000)
     driver.driver.save_screenshot(f'./product_detail_images/{name}_product_detail.png')
     log.info(f"[INFO] Captured screenshot at {name}")
     
@@ -180,7 +266,7 @@ def test():
     product_links, product_names, category = get_links("./api_call/20240330_15h10m_extra_battery_product_link.json")
 
     for link, name in zip(product_links, product_names):
-        naver_shopping_driver = Driver(headless=True, active_user_agent=True, get_log=False)
+        naver_shopping_driver = Driver(headless=False, active_user_agent=False, get_log=False)
         # 원래는 크롤링한 사이트 링크들.
         naver_shopping_driver.get(link)
         
@@ -215,10 +301,10 @@ def test():
             btn_detail_more = naver_shopping_driver.wait_until_by_xpath(3, ".//a[contains(@class, 'imageSpecInfo_btn_detail_more')]")
             naver_shopping_driver.move_to_element(element=btn_detail_more)
             btn_detail_more.click()
-            time.sleep(15)
+            time.sleep(5)
         except:
             log.warning("[WARNING] No see more button.")
-            time.sleep(15)
+            time.sleep(5)
         
         fetch_product_details(naver_shopping_driver, name)
         naver_shopping_driver.release()
