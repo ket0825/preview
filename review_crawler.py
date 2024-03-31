@@ -82,16 +82,19 @@ def fetch_spec(driver:Driver):
 
 def fetch_product_details(driver:Driver):
     # TODO: # 사진 캡처하기. (단, OCR 인식 후에 제품정보 ~ 본 컨텐츠는... 까지 y 좌표 어긋나면 다 주기.)
-    # spec_info_section = naver_shopping_driver.driver.find_element(By.XPATH, ".//h3[contains(@class, 'specInfo_section_title__')]")
-    # naver_shopping_driver.move_to_element(element=spec_info_section)
+    spec_info_section = driver.driver.find_element(By.XPATH, ".//h3[contains(@class, 'specInfo_section_title__')]")
+    driver.move_to_element(element=spec_info_section)
         
     # 제품정보 섹션 캡처
     S = lambda X: driver.driver.execute_script('return document.getElementById("section_spec").'+X)
     driver.driver.set_window_size(S('clientWidth'), S('clientHeight'))
-    b64_image = driver.driver.find_element(By.TAG_NAME, 'body').screenshot_as_base64
-    img_file = BytesIO(b64_image)
-    img = Image.open(img_file)
-    img_asarray = numpy.asarray(img)
+    driver.driver.save_screenshot('product_detail_full.png')
+
+
+    # b64_image = driver.driver.find_element(By.TAG_NAME, 'body').screenshot_as_base64
+    # img_file = BytesIO(b64_image)
+    # img = Image.open(img_file)
+    # img_asarray = numpy.asarray(img)
 
 
 
@@ -150,14 +153,14 @@ def flush_log(driver:Driver):
 
 
 def test():
-    naver_shopping_driver = Driver(headless=False)
+    naver_shopping_driver = Driver(headless=True, active_user_agent=True)
     product_links, product_names, category = get_links("./api_call/20240330_15h10m_extra_battery_product_link.json")
 
     for link, name in zip(product_links, product_names):
         # 원래는 크롤링한 사이트 링크들.
         
         naver_shopping_driver.get(link)
-        # TODO: T cases:
+        # TODO: Test cases:
         # 디알고 헤드셋. 적은 평점.
         # naver_shopping_driver.get("https://search.shopping.naver.com/catalog/36974003618?adId=nad-a001-02-000000223025435&channel=nshop.npla&cat_id=%EB%94%94%EC%A7%80%ED%84%B8/%EA%B0%80%EC%A0%84&NaPm=ct%3Dlu2l3ulc%7Cci%3D0zW0003ypdPztN%5FoFfjw%7Ctr%3Dpla%7Chk%3Dc6b52bbfde6b3967102cd5b772f10fb97a2d3356&cid=0zW0003ypdPztN_oFfjw")
         # 어프어프. 리뷰 없음.
@@ -165,13 +168,12 @@ def test():
         # 로지텍 K830: 리뷰 27000개
         # naver_shopping_driver.get("https://search.shopping.naver.com/catalog/8974763652?&NaPm=ct%3Dlucr5xuw%7Cci%3D5549087459ddae34d93daf8f0d9e0686cf56ea87%7Ctr%3Dslcc%7Csn%3D95694%7Chk%3D784343aaa845130bbe75468952f58e847fc0499c")
 
-        # 브랜드 insert.
-        brand, maker = fetch_brand_maker(naver_shopping_driver)
-        log.info(f"[INFO] Brand: {brand}, Maker: {maker}")
-
         # naver_shopping_driver.wait_until_by_css_selector(3)
         floating_tabs = naver_shopping_driver.wait_until_by_xpath(5, ".//div[contains(@class, 'floatingTab_detail_tab')]")
         product_details = floating_tabs.find_elements(By.XPATH, ".//li")[1]
+        # 브랜드 insert.
+        brand, maker = fetch_brand_maker(naver_shopping_driver)
+        log.info(f"[INFO] Brand: {brand}, Maker: {maker}")
         
         # 리뷰가 없는 제품인 경우.
         try:
