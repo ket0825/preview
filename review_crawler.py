@@ -17,6 +17,7 @@ import random
 import datetime
 from io import BytesIO
 import re
+import os
 # 3rd party lib.
 from driver.driver import Driver
 from selenium.webdriver.common.by import By
@@ -24,8 +25,6 @@ from selenium.webdriver.remote.webelement import WebElement
 from bs4 import BeautifulSoup
 from PIL import Image
 import numpy
-
-
 
 # custom lib.
 from log import Logger 
@@ -36,6 +35,7 @@ total_reviews = []
 double_space_ptrn = re.compile(r" {2,}")
 double_newline_ptrn = re.compile(r"\n{2,}")
 access_word_ptrn = re.compile(r"[^가-힣ㄱ-ㅎㅏ-ㅣ0-9a-zA-Z\s'\"@_#$\^&*\(\)\-=+<>\/\|}{~:…℃±·°※￦\[\]÷\\;,\s]")
+
 
 def get_links(path:str) -> list:
     with open(path, 'r', encoding='utf-8-sig') as json_file:
@@ -153,7 +153,7 @@ def flush_log(driver:Driver):
 
 
 def test():
-    naver_shopping_driver = Driver(headless=True, active_user_agent=True)
+    naver_shopping_driver = Driver(headless=True, active_user_agent=True, get_log=True)
     product_links, product_names, category = get_links("./api_call/20240330_15h10m_extra_battery_product_link.json")
 
     for link, name in zip(product_links, product_names):
@@ -255,6 +255,9 @@ def test():
             current_time = datetime.datetime.now().strftime('%Y%m%d_%Hh%Mm%Ss')            
             
             # 후에는 product_id로 할 것임.
+            if not os.path.exists("./reviews"):
+                os.mkdir("./reviews")
+
             with open(f'./reviews/{current_time}_{category}_{name}_review.json', 'w', encoding='utf-8-sig') as json_file:
                 log.info("Review data from JSON file completed.")
                 json.dump(total_reviews, json_file, ensure_ascii=False)

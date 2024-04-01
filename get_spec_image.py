@@ -17,6 +17,7 @@ import random
 import datetime
 from io import BytesIO
 import re
+import os
 
 # 3rd party lib.
 import requests
@@ -129,6 +130,9 @@ def fetch_product_details(driver:Driver, name:str):
                                                                    'location': val.location
                                                                    }
 
+    if not os.path.exists("./product_images"):
+        os.mkdir("./product_images")                
+
     # brand content banner 존재 시.
     try:
         img_brand_content_exports = driver.driver.find_elements(By.XPATH, ".//div[contains(@class, 'brandContent_export_')]/img")
@@ -177,7 +181,10 @@ def fetch_product_details(driver:Driver, name:str):
     # except Exception as e:
     #     log.info(f"[ERROR] Can't get url. Error: {e}")
 
-                     
+    
+    if not os.path.exists("./product_detail_location"):
+        os.mkdir("./product_detail_location")       
+
     # 위치 파일 주기.
     with open(f'./product_detail_location/{name}_product_detail.json', 'w', encoding='utf-8-sig') as json_file:
         json.dump(page_location_dict, json_file, ensure_ascii=False)
