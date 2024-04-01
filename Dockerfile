@@ -8,8 +8,8 @@ RUN apt-get update \
 && apt-get install -y python3-pip python3.9 cron\
 && ln -s /usr/bin/python3 python
 
-RUN echo "0 * * * * root python /honeybee/product_link_crawler.py >/dev/null 2>&1 \
 # RUN echo "0 * * * * root /usr/local/bin/python /honeybee/product_link_crawler.py >> /var/log/cron.log 2>&1" > /etc/cron.d/crontab\
+RUN echo "0 * * * * root python /honeybee/product_link_crawler.py >/dev/null 2>&1" \
 && rm -rf /var/lib/apt/lists/* \
 && pip install --upgrade pip 
 RUN pip install -r requirements.txt \
