@@ -17,6 +17,10 @@ import random
 import datetime
 from io import BytesIO
 import re
+<<<<<<< HEAD
+=======
+import os
+>>>>>>> 38933f8db30f33a8fd13d57e4ffc23bb05855f3b
 # 3rd party lib.
 from driver.driver import Driver
 from selenium.webdriver.common.by import By
@@ -25,8 +29,11 @@ from bs4 import BeautifulSoup
 from PIL import Image
 import numpy
 
+<<<<<<< HEAD
 
 
+=======
+>>>>>>> 38933f8db30f33a8fd13d57e4ffc23bb05855f3b
 # custom lib.
 from log import Logger 
 log = Logger.get_instance()
@@ -37,6 +44,10 @@ double_space_ptrn = re.compile(r" {2,}")
 double_newline_ptrn = re.compile(r"\n{2,}")
 access_word_ptrn = re.compile(r"[^가-힣ㄱ-ㅎㅏ-ㅣ0-9a-zA-Z\s'\"@_#$\^&*\(\)\-=+<>\/\|}{~:…℃±·°※￦\[\]÷\\;,\s]")
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> 38933f8db30f33a8fd13d57e4ffc23bb05855f3b
 def get_links(path:str) -> list:
     with open(path, 'r', encoding='utf-8-sig') as json_file:
         product_raw_json = json.load(json_file)
@@ -153,7 +164,11 @@ def flush_log(driver:Driver):
 
 
 def test():
+<<<<<<< HEAD
     naver_shopping_driver = Driver(headless=True, active_user_agent=True)
+=======
+    naver_shopping_driver = Driver(headless=True, active_user_agent=True, get_log=True)
+>>>>>>> 38933f8db30f33a8fd13d57e4ffc23bb05855f3b
     product_links, product_names, category = get_links("./api_call/20240330_15h10m_extra_battery_product_link.json")
 
     for link, name in zip(product_links, product_names):
@@ -193,7 +208,11 @@ def test():
         except:
             log.warning("[WARNING] No see more button.")
         
+<<<<<<< HEAD
         fetch_product_details(naver_shopping_driver)
+=======
+        # fetch_product_details(naver_shopping_driver)
+>>>>>>> 38933f8db30f33a8fd13d57e4ffc23bb05855f3b
             
         spec = fetch_spec(naver_shopping_driver)            
         log.info(f"[INFO] Spec: {spec}")
@@ -255,6 +274,12 @@ def test():
             current_time = datetime.datetime.now().strftime('%Y%m%d_%Hh%Mm%Ss')            
             
             # 후에는 product_id로 할 것임.
+<<<<<<< HEAD
+=======
+            if not os.path.exists("./reviews"):
+                os.mkdir("./reviews")
+
+>>>>>>> 38933f8db30f33a8fd13d57e4ffc23bb05855f3b
             with open(f'./reviews/{current_time}_{category}_{name}_review.json', 'w', encoding='utf-8-sig') as json_file:
                 log.info("Review data from JSON file completed.")
                 json.dump(total_reviews, json_file, ensure_ascii=False)

@@ -1,6 +1,10 @@
 #stdlib
 import json
 import datetime
+<<<<<<< HEAD
+=======
+import os
+>>>>>>> 38933f8db30f33a8fd13d57e4ffc23bb05855f3b
 # 3rd party lib.
 from driver.driver import Driver
 from selenium.webdriver.common.by import By
@@ -35,7 +39,11 @@ def review_count_formatter(review_count: WebElement) -> str:
 def test():
     # category = 'smartwatch'
     category = 'extra_battery'
+<<<<<<< HEAD
     naver_shopping_driver = Driver(headless=False, active_user_agent=False)
+=======
+    naver_shopping_driver = Driver(headless=True, active_user_agent=True, get_log=False)
+>>>>>>> 38933f8db30f33a8fd13d57e4ffc23bb05855f3b
 
     # 태그 매치
     """https://saucelabs.com/resources/blog/selenium-tips-css-selectors"""
@@ -117,6 +125,12 @@ def test():
     product_dict['items'] = items
 
     current_time = datetime.datetime.now().strftime('%Y%m%d_%Hh%Mm')
+<<<<<<< HEAD
+=======
+    if not os.path.exists("./api_call"):
+        os.mkdir("./api_call")
+    
+>>>>>>> 38933f8db30f33a8fd13d57e4ffc23bb05855f3b
     with open(f'./api_call/{current_time}_{category}_product_link.json', 'w', encoding='utf-8-sig') as json_file:
         json.dump(product_dict, json_file, ensure_ascii=False)
         log.info(f"[SUCCESS] Success at {category}")
