@@ -35,7 +35,7 @@ def review_count_formatter(review_count: WebElement) -> str:
 
 def test():
     # category = 'smartwatch'
-    category = 'extra_battery'
+    category = 'keyboard'
     naver_shopping_driver = Driver(headless=True, active_user_agent=True, get_log=False)
 
     # 태그 매치
