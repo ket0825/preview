@@ -6,7 +6,7 @@
 # TODO:
 """
 남은 것: 
-1. IP 밴 먹기 처리.
+1. IP 밴 먹기 예외 처리.
 2. OCR 처리.
 """
 
@@ -15,27 +15,19 @@ import json
 import time
 import random
 import datetime
-from io import BytesIO
 import re
-<<<<<<< HEAD
-=======
 import os
->>>>>>> 38933f8db30f33a8fd13d57e4ffc23bb05855f3b
 # 3rd party lib.
 from driver.driver import Driver
 from selenium.webdriver.common.by import By
-from selenium.webdriver.remote.webelement import WebElement
 from bs4 import BeautifulSoup
-from PIL import Image
-import numpy
+from selenium.common.exceptions import NoSuchElementException
 
-<<<<<<< HEAD
-
-
-=======
->>>>>>> 38933f8db30f33a8fd13d57e4ffc23bb05855f3b
 # custom lib.
 from log import Logger 
+from image_processing.ocr_engine import OCREngine, OCREngineOnlyDet
+from image_processing.image_function_main import char_pix_extract, last_image_cut, last_OCR_image
+
 log = Logger.get_instance()
 
 global total_reviews
@@ -44,10 +36,6 @@ double_space_ptrn = re.compile(r" {2,}")
 double_newline_ptrn = re.compile(r"\n{2,}")
 access_word_ptrn = re.compile(r"[^가-힣ㄱ-ㅎㅏ-ㅣ0-9a-zA-Z\s'\"@_#$\^&*\(\)\-=+<>\/\|}{~:…℃±·°※￦\[\]÷\\;,\s]")
 
-<<<<<<< HEAD
-=======
-
->>>>>>> 38933f8db30f33a8fd13d57e4ffc23bb05855f3b
 def get_links(path:str) -> list:
     with open(path, 'r', encoding='utf-8-sig') as json_file:
         product_raw_json = json.load(json_file)
@@ -55,6 +43,12 @@ def get_links(path:str) -> list:
         product_names = [item['name'] for item in product_raw_json['items']]
         category = product_raw_json['category']
         return links, product_names, category, 
+
+
+def ocr_function(src):
+    char_pix_extract(src, )
+    char_pix_extract, last_image_cut, last_OCR_image
+    return []
 
 
 def fetch_brand_maker(driver: Driver):
@@ -92,23 +86,103 @@ def fetch_spec(driver:Driver):
 
 
 def fetch_product_details(driver:Driver):
-    # TODO: # 사진 캡처하기. (단, OCR 인식 후에 제품정보 ~ 본 컨텐츠는... 까지 y 좌표 어긋나면 다 주기.)
     spec_info_section = driver.driver.find_element(By.XPATH, ".//h3[contains(@class, 'specInfo_section_title__')]")
     driver.move_to_element(element=spec_info_section)
+
+    # html tag에 height가 있는데...?
+    naver_spec =  {} # 둘 중 하나임.
+    seller_spec =  {}
+    
+
+    # 본 컨텐츠는 ... 부분 위치.
+    try:
+        driver.wait_until_by_xpath(3, ".//p[contains(@class, 'imageSpecInfo_provide_')]")
+    except:
+        driver.wait_until_by_xpath(3, ".//p[contains(@class, 'specInfo_provide_')]")
+    
+
+    # 일반적인 이미지 스펙 추출 가능한지 확인.
+    try:
+        driver.driver.find_element(By.XPATH, ".//div[contains(@class, 'imageSpecInfo_export_')]")
+    except:
+        log.info(f"[INFO] No export spec at here.")
+        tables = driver.driver.find_elements(By.XPATH, ".//div[contains(@class, 'attribute_product_attribute_')]/table")
+        for table in tables:
+            table_rows = table.find_elements(By.XPATH, ".//tr")
+            for row in table_rows:
+                keys = row.find_elements(By.XPATH, ".//th")
+                vals = row.find_elements(By.XPATH, ".//td")
+                for key, val in zip(keys, vals):
+                    naver_spec[key.text] = {
+                                        'text': val.text, 
+                                        'location': [val.location['y'], val.location['x']]
+                                        }
+                
+    # brand content banner 존재 시.
+    # TODO: # 사진 가져오고, 이후 병렬처리 (multiprocessing)
+    img_spec = []
+    try:
+        img_brand_content_exports = driver.driver.find_elements(By.XPATH, ".//div[contains(@class, 'brandContent_export_')]/img")
+        for img_brand_content_export in img_brand_content_exports:
+            src = img_brand_content_export.get_attribute('src')
+            # .gif, 동영상 등의 확장자를 막기 위함.
+            if '.jpg' not in src or '.png' not in src:
+                continue
+
+            driver.move_to_element(img_brand_content_export)
+            time.sleep(3)
+
+            img_spec_dict = {
+                'img_url': "",
+                'img_loc': [],
+                'img_rendered_size':[],
+                'ocr':[{'text': "", 'bbox': []}]
+            }
+
+            img_spec_dict['img_url'] = src
+            img_spec_dict['img_loc'] = [img_brand_content_export.location['x'], img_brand_content_export.location['y']]
+            img_spec_dict['img_rendered_size'] = [img_brand_content_export.size['height'], img_brand_content_export.size['width']]
+            img_spec_dict['ocr'] = ocr_function(src)  
+            img_spec.append(img_spec_dict)
+
+    except NoSuchElementException:
+        pass
+    # except Exception as e:
+    #     log.info(f"[ERROR] Can't get url. Error: {e}")
         
-    # 제품정보 섹션 캡처
-    S = lambda X: driver.driver.execute_script('return document.getElementById("section_spec").'+X)
-    driver.driver.set_window_size(S('clientWidth'), S('clientHeight'))
-    driver.driver.save_screenshot('product_detail_full.png')
+    # 일반 img spec 존재 시.
+    try:        
+        image_spec_info_product_imgs = driver.driver.find_elements(By.XPATH, ".//p[contains(@id, 'detailFromBrand')]/img")
+        for image_spec_info_product_img in image_spec_info_product_imgs:
+                   
+            src = image_spec_info_product_img.get_attribute('src')            
+            # .gif, 동영상 등의 확장자를 막기 위함.
+            if '.jpg' not in src and '.png' not in src:
+                log.warning("[WARNING] Only JPG or PNG.")
+                continue
+            
+            driver.move_to_element(image_spec_info_product_img)
+            time.sleep(3)
+            img_spec_dict = {
+                'img_url': "",
+                'img_loc': [],
+                'img_rendered_size':[],
+                'ocr':[{'text': "", 'bbox': []}]
+            }
 
+            img_spec_dict['img_url'] = src
+            img_spec_dict['img_loc'] = [img_brand_content_export.location['x'], img_brand_content_export.location['y']]
+            img_spec_dict['img_rendered_size'] = [img_brand_content_export.size['height'], img_brand_content_export.size['width']]
+            img_spec_dict['ocr'] = ocr_function(src)  
+            img_spec.append(img_spec_dict)
+    except NoSuchElementException:        
+        pass
 
-    # b64_image = driver.driver.find_element(By.TAG_NAME, 'body').screenshot_as_base64
-    # img_file = BytesIO(b64_image)
-    # img = Image.open(img_file)
-    # img_asarray = numpy.asarray(img)
+    seller_spec = img_spec
+    # except Exception as e:
+    #     log.info(f"[ERROR] Can't get url. Error: {e}")
 
-
-
+    return naver_spec, seller_spec
 
 
 def get_review_log(driver: Driver):
@@ -164,17 +238,13 @@ def flush_log(driver:Driver):
 
 
 def test():
-<<<<<<< HEAD
-    naver_shopping_driver = Driver(headless=True, active_user_agent=True)
-=======
-    naver_shopping_driver = Driver(headless=True, active_user_agent=True, get_log=True)
->>>>>>> 38933f8db30f33a8fd13d57e4ffc23bb05855f3b
+    naver_shopping_driver = Driver(headless=False, active_user_agent=False, get_log=True)
     product_links, product_names, category = get_links("./api_call/20240330_15h10m_extra_battery_product_link.json")
 
     for link, name in zip(product_links, product_names):
         # 원래는 크롤링한 사이트 링크들.
         
-        naver_shopping_driver.get(link)
+        naver_shopping_driver.get(link) 
         # TODO: Test cases:
         # 디알고 헤드셋. 적은 평점.
         # naver_shopping_driver.get("https://search.shopping.naver.com/catalog/36974003618?adId=nad-a001-02-000000223025435&channel=nshop.npla&cat_id=%EB%94%94%EC%A7%80%ED%84%B8/%EA%B0%80%EC%A0%84&NaPm=ct%3Dlu2l3ulc%7Cci%3D0zW0003ypdPztN%5FoFfjw%7Ctr%3Dpla%7Chk%3Dc6b52bbfde6b3967102cd5b772f10fb97a2d3356&cid=0zW0003ypdPztN_oFfjw")
@@ -184,19 +254,20 @@ def test():
         # naver_shopping_driver.get("https://search.shopping.naver.com/catalog/8974763652?&NaPm=ct%3Dlucr5xuw%7Cci%3D5549087459ddae34d93daf8f0d9e0686cf56ea87%7Ctr%3Dslcc%7Csn%3D95694%7Chk%3D784343aaa845130bbe75468952f58e847fc0499c")
 
         # naver_shopping_driver.wait_until_by_css_selector(3)
-        floating_tabs = naver_shopping_driver.wait_until_by_xpath(5, ".//div[contains(@class, 'floatingTab_detail_tab')]")
-        product_details = floating_tabs.find_elements(By.XPATH, ".//li")[1]
+        try:
+            floating_tabs = naver_shopping_driver.wait_until_by_xpath(10, ".//div[contains(@class, 'floatingTab_detail_tab')]")
+        except:
+            if naver_shopping_driver.driver.find_element(By.XPATH, ".//div[contains(@class, 'content_error')]"):
+                log.warning("[WARNING] IP Blocked.")
+                # 이후 prodxy ip 바꿔서 naver_shopping_driver 다시 얻어야 함.
+
+
         # 브랜드 insert.
         brand, maker = fetch_brand_maker(naver_shopping_driver)
         log.info(f"[INFO] Brand: {brand}, Maker: {maker}")
         
-        # 리뷰가 없는 제품인 경우.
-        try:
-            sort_by_recent = naver_shopping_driver.wait_until_by_xpath(3, ".//a[contains(@class, 'filter_sort') and contains(@data-nclick, 'rec')]") # recent라는 뜻임.
-        except Exception as e:
-            log.warning(f"[WARNING] No Reviews in {name}. Go to next product.")
-            continue
-
+        # 제품 상세 보러가기
+        product_details = floating_tabs.find_elements(By.XPATH, ".//li")[1]
         naver_shopping_driver.move_to_element(element=product_details)
         product_details.click()
 
@@ -208,19 +279,29 @@ def test():
         except:
             log.warning("[WARNING] No see more button.")
         
-<<<<<<< HEAD
-        fetch_product_details(naver_shopping_driver)
-=======
-        # fetch_product_details(naver_shopping_driver)
->>>>>>> 38933f8db30f33a8fd13d57e4ffc23bb05855f3b
-            
-        spec = fetch_spec(naver_shopping_driver)            
-        log.info(f"[INFO] Spec: {spec}")
+        # 제품 상세에서 ocr 및 location 따기.
+        naver_spec, seller_spec = fetch_product_details(naver_shopping_driver)
+        with open('specs.json', 'a', encoding='utf-8-sig') as json_file:
+            json.dump([naver_spec, seller_spec], json_file, ensure_ascii=False)
 
+        # 제품 네이버 스펙 보러가기.
+        spec = fetch_spec(naver_shopping_driver)            
+        log.info(f"[INFO] Spec: {spec}")            
+
+        # 리뷰 크롤링하기.
         review_filters = naver_shopping_driver.driver.find_elements(By.XPATH, ".//ul[contains(@class, 'filter_top_list_')]/li")
         review_filters.pop(0) # 필터 중 전체 별점 제거.
         
-        flush_log(naver_shopping_driver) # 필요 없는 log 제거.
+        # 필요 없는 log 제거.
+        flush_log(naver_shopping_driver)
+
+        # 리뷰가 없는 제품인 경우. 스킵함.
+        try:
+            sort_by_recent = naver_shopping_driver.wait_until_by_xpath(3, ".//a[contains(@class, 'filter_sort') and contains(@data-nclick, 'rec')]") # recent라는 뜻임.
+        except Exception as e:
+            log.warning(f"[WARNING] No Reviews in {name}. Go to next product.")
+            continue
+
 
         for review_filter in review_filters:
             naver_shopping_driver.move_to_element(element=sort_by_recent)
@@ -260,6 +341,7 @@ def test():
                     review_page.click()
 
                     try:
+                        # 100 페이지를 넘어가려고 하면 경고가 나옴.
                         naver_shopping_driver.driver.switch_to.alert.accept()
                         log.warning(f"[WARNING] Over 2000+ review.")
                         is_last_page = True
@@ -274,12 +356,9 @@ def test():
             current_time = datetime.datetime.now().strftime('%Y%m%d_%Hh%Mm%Ss')            
             
             # 후에는 product_id로 할 것임.
-<<<<<<< HEAD
-=======
             if not os.path.exists("./reviews"):
                 os.mkdir("./reviews")
 
->>>>>>> 38933f8db30f33a8fd13d57e4ffc23bb05855f3b
             with open(f'./reviews/{current_time}_{category}_{name}_review.json', 'w', encoding='utf-8-sig') as json_file:
                 log.info("Review data from JSON file completed.")
                 json.dump(total_reviews, json_file, ensure_ascii=False)
@@ -290,7 +369,7 @@ def test():
     naver_shopping_driver.release()
 
 
-if __name__ == '__main__':
+if __name__ == '__main__':    
     test()
 
 
