@@ -9,52 +9,57 @@ import copy
 import requests
 from io import BytesIO
 from log import Logger
+import re
 
-from typing import List
+
+hanja_ptrn = re.compile(r'[一-龥]')
+kor_ptrn = re.compile(r'[가-힣]')
+kor_vowel_consonant_ptrn = re.compile(r'[ㄱ-ㅎㅏ-ㅣ]]')
+eng_ptrn = re.compile(r'[a-zA-Z]')
+
 
 ocr = PaddleOCR(lang="korean")
 log = Logger.get_instance()
 
 
-def slice_image_vertically(image_path, gap):
+# def slice_image_vertically(image_path, gap):
       
-    # 이미지 로드
-    image = Image.open(image_path)
-    width = image.size[0]   # 이미지 가로
-    height = image.size[1]  # 이미지 세로
+#     # 이미지 로드
+#     image = Image.open(image_path)
+#     width = image.size[0]   # 이미지 가로
+#     height = image.size[1]  # 이미지 세로
     
-    cuted_pix=[]
-    # 이미지 잘라서 저장
-    for i in range(0, height, gap):
-        box = (0, i, width, min(i + gap, height))   # 맨 끝부분
-        cuted_pix.append(min(i + gap, height))
-        image_gap = image.crop(box)
-        image_gap.save(os.path.join(folder_name, f"{i}.jpg"))
+#     cuted_pix=[]
+#     # 이미지 잘라서 저장
+#     for i in range(0, height, gap):
+#         box = (0, i, width, min(i + gap, height))   # 맨 끝부분
+#         cuted_pix.append(min(i + gap, height))
+#         image_gap = image.crop(box)
+#         image_gap.save(os.path.join(folder_name, f"{i}.jpg"))
     
-    return height # 높이값 반환
+#     return height # 높이값 반환
 
 
-def OCR_image(images, gap:int): 
+def OCR_image(images_array, gap:int, ocr_engine): 
     """
-    images: list[Image]
+    images_array: list[nd.array]
     """
-    images
-
     # 텍스트랑 좌표 1:1로 매칭시켜서 넣을 리스트
     bbox_sequence=[]
-    for cnt, image in enumerate(images):
+    for cnt, image_array in enumerate(images_array):
         # ocr 수행
         try:
             # detection(bounding box)만 진행.
-            result=ocr.ocr(image, det=True, rec=False, cls=False) 
+            result=ocr_engine.ocr(image_array, det=True, rec=False, cls=False) 
         except ValueError as val_error:
             log.error("[ERROR] value error in lib. Must modify in paddleocr line 681.")
+        
         # 잘린 사진에서 글이 없을 수 있음.
         if not result or not result[0]:
             continue
-            
-        for line in result[0]:            
-        # 바운딩박스 좌표들을 갭에 맞춰서 리스트에 추가.
+
+        # 바운딩박스 좌표들을 갭에 맞춰서 리스트에 추가.    
+        for line in result[0]:                    
             bbox_sequence.append([[ax[0], ax[1]+gap*cnt] for ax in line])
 
     return bbox_sequence     #바운딩 박스 좌표랑 문자가 튜플로 묶인 리스트 반환
@@ -69,7 +74,7 @@ def find_small_largest(arr, target):
         mid = (left + right) // 2
         
         if arr[mid] == target:
-            return arr[mid-1]
+            return arr[mid-1] # 일부로 하나 전까지만 자름.
         elif arr[mid] < target:
             left = mid + 1
         else:
@@ -84,33 +89,53 @@ def find_small_largest(arr, target):
 
 
 # 이미지 자를 임계값 픽셀 찾기
-def char_pix_extract(image_path):
-    image_path=image_path
-    boundary=[]
-    cut_candidate=set()
+def char_pix_extract(image_path, ocr_engine):
+    """
+    image_path: img tag src attribute. e.g link of img.
+
+    ocr_engine: OCREngine instance type
+    """
+
     # slice_image_vertically 가져옴.
     # 이미지 로드
-    res = requests.get(image_path)
-    image = Image.open(BytesIO(res.content))
+    if 'http' in image_path:
+        res = requests.get(image_path)
+        image = Image.open(BytesIO(res.content))
+    else:
+        image = Image.open(image_path)
 
+    
     width = image.size[0]   # 이미지 가로
     height = image.size[1]  # 이미지 세로
-    gap = 2000
-    cuted_pix=[]
-    cropped_images = []
-    # 이미지 잘라서 저장
-    for i in range(0, height, gap):
-        box = (0, i, width, min(i + gap, height))   # 맨 끝부분
-        cuted_pix.append(min(i + gap, height))
-        image_gap = image.crop(box)
-        cropped_images.append(image_gap)
 
-    if height < cut_height:
+    if height < 2000:
         return [0, height]
     
-    for cut_height in (2000, 1700): # 최소공배수 34000.
-       
-        result=OCR_image('image', cut_height)
+    cropped_images_2000 = []
+    cropped_images_1700 = []
+    gaps = (1700, 2000) # 최소공배수 34000.
+    for gap in gaps:
+        # 이미지 잘라서 저장
+        if gap == 2000:
+            for i in range(0, height, gap):
+                box = (0, i, width, min(i + gap, height))   # 맨 끝부분            
+                image_gap = np.asarray(image.crop(box), dtype='uint8')
+                cropped_images_2000.append(image_gap)
+        elif gap == 1700:
+            for i in range(0, height, gap):
+                box = (0, i, width, min(i + gap, height))   # 맨 끝부분            
+                image_gap = np.asarray(image.crop(box), dtype='uint8')
+                cropped_images_1700.append(image_gap)
+
+    boundary=[]
+    cut_candidate=set()
+    for cut_height in gaps: 
+        if cut_height == 1700:       
+            result = OCR_image(cropped_images_1700, cut_height, ocr_engine)
+            cropped_images_1700.clear()
+        elif cut_height == 2000:       
+            result = OCR_image(cropped_images_2000, cut_height, ocr_engine)
+            cropped_images_2000.clear()
         for bounding_box in result:
             top= int(min([bounding_box[i][1] for i in range(4)]))
             bottom=int(max([bounding_box[i][1] for i in range(4)]))
@@ -150,18 +175,22 @@ def char_pix_extract(image_path):
     result_pix_set.add(0) # 처음 픽셀 높이 넣어주기.
     result_pix_set.add(height) # 맨 마지막 픽셀 (height) 넣어주기
         
-
     return sorted(result_pix_set)
 
 
 # 찾은 임계값 기준으로 이미지 자르기
 def last_image_cut(image_path, folder_name, cut_pix_list):
     # 잘린 이미지 저장할 폴더 생성
-    if not os.path.exists(folder_name):
-        os.makedirs(folder_name)
-    
+    if not os.path.isdir(folder_name):
+        os.mkdir(folder_name)
+
     # 이미지 로드
-    image = Image.open(image_path)
+    if 'http' in image_path:
+        res = requests.get(image_path)
+        image = Image.open(BytesIO(res.content))
+    else:
+        image = Image.open(image_path)
+
     width = image.size[0]   # 이미지 가로
     
     for i in range(len(cut_pix_list)-1):
@@ -170,7 +199,7 @@ def last_image_cut(image_path, folder_name, cut_pix_list):
         croped_image.save(os.path.join(folder_name, f"{i}.jpg"))
 
 
-def last_OCR_image(folder_name, cut_pix_list):
+def last_OCR_image(folder_name, cut_pix_list, ocr_engine):
     image_list = os.listdir(folder_name)
     # 이미지 잘린 순서대로 정렬
     image_list = sorted(image_list, key=lambda x: int(''.join(filter(str.isdigit, x))))
@@ -180,19 +209,30 @@ def last_OCR_image(folder_name, cut_pix_list):
     for image_index, cut_line in zip(image_list, cut_pix_list[:-1]):
         image_path=os.path.join(folder_name, image_index)
         # ocr 수행
-        result=ocr.ocr(image_path, cls=False)
+        result=ocr_engine.ocr(image_path, cls=True)
 
         if not result or not result[0]:
             continue
         
         # 픽셀을 나눠놨기 때문에 result의 바운딩 박스 y좌표에 gap을 더해줘야함
         for line in result[0]:
+            # 글자 이상한 것 체크.
+            exist_kor_eng = eng_ptrn.search(line[1][0]) and kor_ptrn.search(line[1][0])
+            exist_hanja = hanja_ptrn.search(line[1][0])
+            exist_kor_vowel_consonant = kor_vowel_consonant_ptrn.search(line[1][0])
+
+            if exist_hanja or exist_kor_vowel_consonant:
+                continue
+            elif exist_kor_eng:
+                if line[1][1] < 0.85:
+                    continue                        
+
             for ax in line[0]:
                 ax[1]+=cut_line
-        # 바운딩박스 좌표랑 문자를 튜플로 묶어서 리스트에 추가
-            ocr_sequence.append((line[1][0], line[0]))
-
-    # 이미지 잘라서 넣었던 폴더 제거
+        # 바운딩박스 좌표랑 문자를 dict으로 묶어서 리스트에 추가
+            ocr_sequence.append({'text':line[1][0], "bbox":line[0]})
+        
+        # 임시로 만들었던 폴더 제거
     if os.path.exists(folder_name):
         for file_name in os.listdir(folder_name):
             file_path = os.path.join(folder_name, file_name)
@@ -200,5 +240,8 @@ def last_OCR_image(folder_name, cut_pix_list):
                 os.unlink(file_path)
             elif os.path.isdir(file_path):
                 shutil.rmtree(file_path)
+        os.rmdir(folder_name)
 
     return ocr_sequence     #바운딩 박스 좌표랑 문자가 튜플로 묶인 리스트 반환
+
+
