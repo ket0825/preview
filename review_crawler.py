@@ -25,8 +25,8 @@ from selenium.common.exceptions import NoSuchElementException
 
 # custom lib.
 from log import Logger 
-from image_processing.ocr_engine import OCREngine, OCREngineOnlyDet
-from image_processing.image_function_main import char_pix_extract, last_image_cut, last_OCR_image
+from image_processing.ocr_engine import OCREngine
+from image_processing.image_function_main import char_pix_extract, make_ocr_sequence
 
 log = Logger.get_instance()
 
@@ -35,6 +35,7 @@ total_reviews = []
 double_space_ptrn = re.compile(r" {2,}")
 double_newline_ptrn = re.compile(r"\n{2,}")
 access_word_ptrn = re.compile(r"[^가-힣ㄱ-ㅎㅏ-ㅣ0-9a-zA-Z\s'\"@_#$\^&*\(\)\-=+<>\/\|}{~:…℃±·°※￦\[\]÷\\;,\s]")
+
 
 def get_links(path:str) -> list:
     with open(path, 'r', encoding='utf-8-sig') as json_file:
@@ -46,9 +47,8 @@ def get_links(path:str) -> list:
 
 
 def ocr_function(src):
-    char_pix_extract(src, )
-    char_pix_extract, last_image_cut, last_OCR_image
-    return []
+    cut_pix_list = char_pix_extract(src)    
+    return make_ocr_sequence(src, cut_pix_list)
 
 
 def fetch_brand_maker(driver: Driver):
@@ -84,16 +84,46 @@ def fetch_spec(driver:Driver):
     # TODO: fetch 진행
     return spec_dict
 
+def get_image_specs(driver:Driver, xpath):
+    """
+    Get image specs with xpath.
+    """
+    web_elements = driver.driver.find_elements(By.XPATH, xpath)
+    img_spec = []
+    for web_element in web_elements:
+        src = web_element.get_attribute('src')
+        # .gif, 동영상 등의 확장자를 막기 위함.
+        if '.jpg' not in src and '.png' not in src:
+            continue
 
+        driver.move_to_element(web_element)
+        time.sleep(3)
+
+        img_spec_dict = {
+            'img_url': "",
+            'img_loc': [],
+            'img_rendered_size':[],
+            'ocr':[{'text': "", 'bbox': []}]
+        }
+
+        img_spec_dict['img_url'] = src
+        img_spec_dict['img_loc'] = [web_element.location['x'], web_element.location['y']]
+        img_spec_dict['img_rendered_size'] = [web_element.size['width'], web_element.size['height']]
+        img_spec_dict['ocr'] = ocr_function(src)
+        img_spec.append(img_spec_dict)
+    
+    return img_spec
+
+# TODO: later, it should be an multiprocessing.
 def fetch_product_details(driver:Driver):
     spec_info_section = driver.driver.find_element(By.XPATH, ".//h3[contains(@class, 'specInfo_section_title__')]")
     driver.move_to_element(element=spec_info_section)
 
     # html tag에 height가 있는데...?
     naver_spec =  {} # 둘 중 하나임.
-    seller_spec =  {}
+    seller_spec =  []
     
-
+    
     # 본 컨텐츠는 ... 부분 위치.
     try:
         driver.wait_until_by_xpath(3, ".//p[contains(@class, 'imageSpecInfo_provide_')]")
@@ -105,6 +135,7 @@ def fetch_product_details(driver:Driver):
     try:
         driver.driver.find_element(By.XPATH, ".//div[contains(@class, 'imageSpecInfo_export_')]")
     except:
+        # 안되면 naver spec.
         log.info(f"[INFO] No export spec at here.")
         tables = driver.driver.find_elements(By.XPATH, ".//div[contains(@class, 'attribute_product_attribute_')]/table")
         for table in tables:
@@ -119,68 +150,20 @@ def fetch_product_details(driver:Driver):
                                         }
                 
     # brand content banner 존재 시.
-    # TODO: # 사진 가져오고, 이후 병렬처리 (multiprocessing)
-    img_spec = []
+    # TODO: # 사진 가져오고, 이후 병렬처리 (multiprocessing)    
     try:
-        img_brand_content_exports = driver.driver.find_elements(By.XPATH, ".//div[contains(@class, 'brandContent_export_')]/img")
-        for img_brand_content_export in img_brand_content_exports:
-            src = img_brand_content_export.get_attribute('src')
-            # .gif, 동영상 등의 확장자를 막기 위함.
-            if '.jpg' not in src or '.png' not in src:
-                continue
-
-            driver.move_to_element(img_brand_content_export)
-            time.sleep(3)
-
-            img_spec_dict = {
-                'img_url': "",
-                'img_loc': [],
-                'img_rendered_size':[],
-                'ocr':[{'text': "", 'bbox': []}]
-            }
-
-            img_spec_dict['img_url'] = src
-            img_spec_dict['img_loc'] = [img_brand_content_export.location['x'], img_brand_content_export.location['y']]
-            img_spec_dict['img_rendered_size'] = [img_brand_content_export.size['height'], img_brand_content_export.size['width']]
-            img_spec_dict['ocr'] = ocr_function(src)  
-            img_spec.append(img_spec_dict)
-
+        seller_spec.extend(get_image_specs(driver, ".//div[contains(@class, 'brandContent_export_')]/img"))
     except NoSuchElementException:
         pass
     # except Exception as e:
     #     log.info(f"[ERROR] Can't get url. Error: {e}")
         
     # 일반 img spec 존재 시.
-    try:        
-        image_spec_info_product_imgs = driver.driver.find_elements(By.XPATH, ".//p[contains(@id, 'detailFromBrand')]/img")
-        for image_spec_info_product_img in image_spec_info_product_imgs:
-                   
-            src = image_spec_info_product_img.get_attribute('src')            
-            # .gif, 동영상 등의 확장자를 막기 위함.
-            if '.jpg' not in src and '.png' not in src:
-                log.warning("[WARNING] Only JPG or PNG.")
-                continue
-            
-            driver.move_to_element(image_spec_info_product_img)
-            time.sleep(3)
-            img_spec_dict = {
-                'img_url': "",
-                'img_loc': [],
-                'img_rendered_size':[],
-                'ocr':[{'text': "", 'bbox': []}]
-            }
-
-            img_spec_dict['img_url'] = src
-            img_spec_dict['img_loc'] = [img_brand_content_export.location['x'], img_brand_content_export.location['y']]
-            img_spec_dict['img_rendered_size'] = [img_brand_content_export.size['height'], img_brand_content_export.size['width']]
-            img_spec_dict['ocr'] = ocr_function(src)  
-            img_spec.append(img_spec_dict)
+    try:
+        seller_spec.extend(get_image_specs(driver, ".//p[contains(@id, 'detailFromBrand')]/img"))                
     except NoSuchElementException:        
         pass
 
-    seller_spec = img_spec
-    # except Exception as e:
-    #     log.info(f"[ERROR] Can't get url. Error: {e}")
 
     return naver_spec, seller_spec
 
@@ -282,7 +265,7 @@ def test():
         # 제품 상세에서 ocr 및 location 따기.
         naver_spec, seller_spec = fetch_product_details(naver_shopping_driver)
         with open('specs.json', 'a', encoding='utf-8-sig') as json_file:
-            json.dump([naver_spec, seller_spec], json_file, ensure_ascii=False)
+            json.dump({"naver_spec": naver_spec, "seller_spec": seller_spec}, json_file, ensure_ascii=False)
 
         # 제품 네이버 스펙 보러가기.
         spec = fetch_spec(naver_shopping_driver)            

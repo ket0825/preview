@@ -10,16 +10,14 @@ import requests
 from io import BytesIO
 from log import Logger
 import re
-
-
+from image_processing.ocr_engine import OCREngine
 hanja_ptrn = re.compile(r'[一-龥]')
 kor_ptrn = re.compile(r'[가-힣]')
 kor_vowel_consonant_ptrn = re.compile(r'[ㄱ-ㅎㅏ-ㅣ]]')
 eng_ptrn = re.compile(r'[a-zA-Z]')
 
-
-ocr = PaddleOCR(lang="korean")
 log = Logger.get_instance()
+ocr_engine = OCREngine.get_instance()
 
 
 # def slice_image_vertically(image_path, gap):
@@ -39,8 +37,7 @@ log = Logger.get_instance()
     
 #     return height # 높이값 반환
 
-
-def OCR_image(images_array, gap:int, ocr_engine): 
+def OCR_image(images_array, gap:int): 
     """
     images_array: list[nd.array]
     """
@@ -80,23 +77,23 @@ def find_small_largest(arr, target):
         else:
             right = mid - 1
     
-    # while문 끝나고 났을때 right가 더 작은 값이 되어있음
-    if(arr[right]<target):
+    # 못찾은 경우(while문 끝나고 났을때 right가 더 작은 값이 되어있음)
+
+    if arr[right] < target:
         return arr[right]
     else:
         return arr[right-1]
     
 
-
 # 이미지 자를 임계값 픽셀 찾기
-def char_pix_extract(image_path, ocr_engine):
+def char_pix_extract(image_path):
     """
+    이미지 자를 임계값 픽셀 찾기
+
     image_path: img tag src attribute. e.g link of img.
 
-    ocr_engine: OCREngine instance type
     """
 
-    # slice_image_vertically 가져옴.
     # 이미지 로드
     if 'http' in image_path:
         res = requests.get(image_path)
@@ -131,10 +128,10 @@ def char_pix_extract(image_path, ocr_engine):
     cut_candidate=set()
     for cut_height in gaps: 
         if cut_height == 1700:       
-            result = OCR_image(cropped_images_1700, cut_height, ocr_engine)
+            result = OCR_image(cropped_images_1700, cut_height)
             cropped_images_1700.clear()
         elif cut_height == 2000:       
-            result = OCR_image(cropped_images_2000, cut_height, ocr_engine)
+            result = OCR_image(cropped_images_2000, cut_height)
             cropped_images_2000.clear()
         for bounding_box in result:
             top= int(min([bounding_box[i][1] for i in range(4)]))
@@ -157,10 +154,9 @@ def char_pix_extract(image_path, ocr_engine):
     cut_candidate = sorted(cut_candidate)
         
     result_pix_set = set()
-    print("이미지 길이:", height)
+    log.info(f"이미지 길이: {height}")
     
     cut_line = 2000
-    # print("후보:", cut_candidate)
     while cut_line < height:
         new_cut = find_small_largest(cut_candidate, cut_line)
         # 새롭게 찾은게 기준선보다 크거나 같으면, 혹은 이미 있었던 선이면 기준선으로 넣어줘야함.
@@ -178,12 +174,14 @@ def char_pix_extract(image_path, ocr_engine):
     return sorted(result_pix_set)
 
 
-# 찾은 임계값 기준으로 이미지 자르기
-def last_image_cut(image_path, folder_name, cut_pix_list):
-    # 잘린 이미지 저장할 폴더 생성
-    if not os.path.isdir(folder_name):
-        os.mkdir(folder_name)
+# 찾은 임계값 기준으로 이미지 자르고 ocr 돌리기.
+def make_ocr_sequence(image_path, cut_pix_list):
+    """
+    image_path: img tag src attribute. e.g link of img.
 
+    cut_pix_list: sorted cutline list.
+    """
+    ocr_sequence = []
     # 이미지 로드
     if 'http' in image_path:
         res = requests.get(image_path)
@@ -194,12 +192,42 @@ def last_image_cut(image_path, folder_name, cut_pix_list):
     width = image.size[0]   # 이미지 가로
     
     for i in range(len(cut_pix_list)-1):
+        cut_line = cut_pix_list[i+1] - cut_pix_list[i]
         box = (0, cut_pix_list[i], width, cut_pix_list[i+1])
-        croped_image = image.crop(box)
-        croped_image.save(os.path.join(folder_name, f"{i}.jpg"))
+        cropped_image_arr = np.asarray(image.crop(box), dtype='uint8')
+        result = ocr_engine.ocr(cropped_image_arr, cls=True)
+
+        if not result or not result[0]:
+            continue
+    
+        # 픽셀을 나눠놨기 때문에 result의 바운딩 박스 y좌표에 gap을 더해줘야함
+        for line in result[0]:
+            # 글자 이상한 것 체크.
+            exist_kor_eng = eng_ptrn.search(line[1][0]) and kor_ptrn.search(line[1][0])
+            exist_hanja = hanja_ptrn.search(line[1][0])
+            exist_kor_vowel_consonant = kor_vowel_consonant_ptrn.search(line[1][0])
+
+            if exist_hanja or exist_kor_vowel_consonant:
+                continue
+            elif (exist_kor_eng 
+                  and line[1][1] < 0.85 # 정확도 체크.
+                  ): 
+                continue
+            elif (eng_ptrn 
+                  and line[1][1] < 0.9 # 정확도 체크.
+                  ):
+                continue
+
+            for ax in line[0]:
+                ax[1]+=cut_line
+        # 문자와 바운딩박스 좌표를 dict으로 묶어서 리스트에 추가
+            ocr_sequence.append({'text':line[1][0], "bbox":line[0]})
+    log.info(f"[SUCCESS] OCR completed.")
+
+    return ocr_sequence
 
 
-def last_OCR_image(folder_name, cut_pix_list, ocr_engine):
+def last_OCR_image(folder_name, cut_pix_list):
     image_list = os.listdir(folder_name)
     # 이미지 잘린 순서대로 정렬
     image_list = sorted(image_list, key=lambda x: int(''.join(filter(str.isdigit, x))))
@@ -210,6 +238,7 @@ def last_OCR_image(folder_name, cut_pix_list, ocr_engine):
         image_path=os.path.join(folder_name, image_index)
         # ocr 수행
         result=ocr_engine.ocr(image_path, cls=True)
+        
 
         if not result or not result[0]:
             continue
@@ -223,13 +252,18 @@ def last_OCR_image(folder_name, cut_pix_list, ocr_engine):
 
             if exist_hanja or exist_kor_vowel_consonant:
                 continue
-            elif exist_kor_eng:
-                if line[1][1] < 0.85:
-                    continue                        
+            elif (exist_kor_eng 
+                  and line[1][1] < 0.85 # 정확도 체크.
+                  ): 
+                continue
+            elif (eng_ptrn 
+                  and line[1][1] < 0.9 # 정확도 체크.
+                  ):
+                continue
 
             for ax in line[0]:
                 ax[1]+=cut_line
-        # 바운딩박스 좌표랑 문자를 dict으로 묶어서 리스트에 추가
+        # 문자와 바운딩박스 좌표를 dict으로 묶어서 리스트에 추가
             ocr_sequence.append({'text':line[1][0], "bbox":line[0]})
         
         # 임시로 만들었던 폴더 제거
