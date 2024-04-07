@@ -17,17 +17,24 @@ import random
 import datetime
 from io import BytesIO
 import re
+<<<<<<< HEAD
+# 3rd party lib.
+=======
 import os
 
 # 3rd party lib.
 import requests
+>>>>>>> 38933f8db30f33a8fd13d57e4ffc23bb05855f3b
 from driver.driver import Driver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webelement import WebElement
 from bs4 import BeautifulSoup
 from PIL import Image
 import numpy
+<<<<<<< HEAD
+=======
 from selenium.common.exceptions import NoSuchElementException
+>>>>>>> 38933f8db30f33a8fd13d57e4ffc23bb05855f3b
 
 
 
@@ -85,6 +92,16 @@ def fetch_spec(driver:Driver):
 
 
 def fetch_product_details(driver:Driver, name:str):
+<<<<<<< HEAD
+    # TODO: # 사진 캡처하기. (단, OCR 인식 후에 제품정보 ~ 본 컨텐츠는... 까지 y 좌표 어긋나면 다 주기.)
+    spec_info_section = driver.driver.find_element(By.XPATH, ".//h3[contains(@class, 'specInfo_section_title__')]")
+    driver.move_to_element(element=spec_info_section)
+
+    page_location_dict = {}
+    # 스펙 부분 위치.
+    product_detail = driver.driver.find_element(By.ID, "section_spec")
+    page_location_dict['product_detail'] = product_detail.location
+=======
     # TODO: # 사진 가져오고, 이후 병렬처리 (multiprocessing)
     spec_info_section = driver.driver.find_element(By.XPATH, ".//h3[contains(@class, 'specInfo_section_title__')]")
     driver.move_to_element(element=spec_info_section)
@@ -100,6 +117,7 @@ def fetch_product_details(driver:Driver, name:str):
     product_detail = driver.driver.find_element(By.ID, "section_spec")
     page_location_dict['product_detail'] = product_detail.location
     
+>>>>>>> 38933f8db30f33a8fd13d57e4ffc23bb05855f3b
     # 본 컨텐츠는 ... 부분 위치.
     try:
         imageSpecInfo_provide = driver.wait_until_by_xpath(3, ".//p[contains(@class, 'imageSpecInfo_provide_')]")
@@ -107,13 +125,23 @@ def fetch_product_details(driver:Driver, name:str):
     except:
         SpecInfo_provide = driver.wait_until_by_xpath(3, ".//p[contains(@class, 'specInfo_provide_')]")
         page_location_dict['spec_info_provide'] = SpecInfo_provide.location
+<<<<<<< HEAD
+        
+
+=======
     
+>>>>>>> 38933f8db30f33a8fd13d57e4ffc23bb05855f3b
     # 전체 페이지 높이 가져오기
     total_height = driver.driver.execute_script("return Math.max(document.documentElement.scrollHeight, document.body.scrollHeight);")
     # 전체 페이지 너비 가져오기
     total_width = driver.driver.execute_script("return Math.max(document.documentElement.scrollWidth, document.body.scrollWidth);")
     page_location_dict['total'] = {'x': total_width, 'y': total_height}
 
+<<<<<<< HEAD
+    with open(f'./product_detail_location/{name}_product_detail.json', 'w', encoding='utf-8-sig') as json_file:
+        json.dump(page_location_dict, json_file, ensure_ascii=False)
+
+=======
     # 일반적인 이미지 스펙 추출 가능한지 확인.
     try:
         driver.driver.find_element(By.XPATH, ".//div[contains(@class, 'imageSpecInfo_export_')]")
@@ -199,11 +227,15 @@ def fetch_product_details(driver:Driver, name:str):
     time.sleep(3)
     driver.move_to_element(element=spec_info_section)
 
+>>>>>>> 38933f8db30f33a8fd13d57e4ffc23bb05855f3b
 
     # 제품정보 섹션 캡처.
     S = lambda X: driver.driver.execute_script('return document.getElementById("section_spec").'+X)
     driver.driver.set_window_size(S('clientWidth'), S('clientHeight')+100)
+<<<<<<< HEAD
+=======
     time.sleep(page_location_dict['spec_info_provide']['y'] - page_location_dict['product_detail']['y'] // 10000)
+>>>>>>> 38933f8db30f33a8fd13d57e4ffc23bb05855f3b
     driver.driver.save_screenshot(f'./product_detail_images/{name}_product_detail.png')
     log.info(f"[INFO] Captured screenshot at {name}")
     
@@ -237,8 +269,14 @@ def get_review_log(driver: Driver):
 
     # for review in total_reviews:
     #     log.info(review)
+<<<<<<< HEAD
+from typing import List, Dict
+
+def review_formatter(reviews: List[Dict]) -> None:
+=======
 
 def review_formatter(reviews:list[dict]) -> None:
+>>>>>>> 38933f8db30f33a8fd13d57e4ffc23bb05855f3b
     # remain_key = ['id', 'content', 'aidaModifyTime', 'mallId', 'mallSeq', 'matchNvMid', 'qualityScore', 'starScore', 'topicCount', "topicYn", 'topics', 'userId', 'mallName']    
     keys_to_remove = ["buyOption", "aidaCreateTime", "esModifyTime", "modifyDate", "pageUrl", "registerDate", "imageCount", "imageYn", "images", "mallProductId", "mallReviewId", "rankScore", "title", "videoCount", "videoYn", "videos", "mallLogoUrl"]
     for review in reviews:
@@ -273,7 +311,11 @@ def test():
     product_links, product_names, category = get_links("./api_call/20240330_15h10m_extra_battery_product_link.json")
 
     for link, name in zip(product_links, product_names):
+<<<<<<< HEAD
+        naver_shopping_driver = Driver(headless=True, active_user_agent=True, get_log=False)
+=======
         naver_shopping_driver = Driver(headless=False, active_user_agent=False, get_log=False)
+>>>>>>> 38933f8db30f33a8fd13d57e4ffc23bb05855f3b
         # 원래는 크롤링한 사이트 링크들.
         naver_shopping_driver.get(link)
         
@@ -298,7 +340,10 @@ def test():
             sort_by_recent = naver_shopping_driver.wait_until_by_xpath(3, ".//a[contains(@class, 'filter_sort') and contains(@data-nclick, 'rec')]") # recent라는 뜻임.
         except Exception as e:
             log.warning(f"[WARNING] No Reviews in {name}. Go to next product.")
+<<<<<<< HEAD
+=======
             naver_shopping_driver.release()
+>>>>>>> 38933f8db30f33a8fd13d57e4ffc23bb05855f3b
             continue
 
         naver_shopping_driver.move_to_element(element=product_details)
@@ -309,10 +354,17 @@ def test():
             btn_detail_more = naver_shopping_driver.wait_until_by_xpath(3, ".//a[contains(@class, 'imageSpecInfo_btn_detail_more')]")
             naver_shopping_driver.move_to_element(element=btn_detail_more)
             btn_detail_more.click()
+<<<<<<< HEAD
+            time.sleep(15)
+        except:
+            log.warning("[WARNING] No see more button.")
+            time.sleep(15)
+=======
             time.sleep(5)
         except:
             log.warning("[WARNING] No see more button.")
             time.sleep(5)
+>>>>>>> 38933f8db30f33a8fd13d57e4ffc23bb05855f3b
         
         fetch_product_details(naver_shopping_driver, name)
         naver_shopping_driver.release()
