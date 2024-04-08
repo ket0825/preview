@@ -221,8 +221,8 @@ def flush_log(driver:Driver):
 
 
 def test():
-    naver_shopping_driver = Driver(headless=False, active_user_agent=False, get_log=True)
-    product_links, product_names, category = get_links("./api_call/20240330_15h10m_extra_battery_product_link.json")
+    naver_shopping_driver = Driver(headless=True, active_user_agent=True, get_log=True)
+    product_links, product_names, category = get_links("./api_call/20240402_04h11m_keyboard_product_link.json")
 
     for link, name in zip(product_links, product_names):
         # 원래는 크롤링한 사이트 링크들.
@@ -345,7 +345,8 @@ def test():
             with open(f'./reviews/{current_time}_{category}_{name}_review.json', 'w', encoding='utf-8-sig') as json_file:
                 log.info("Review data from JSON file completed.")
                 json.dump(total_reviews, json_file, ensure_ascii=False)
-            
+            # keyboard_COX CK108 블랙/다크그레이 게이트론 LED 게이밍 기계식 키보드_review.json
+            # 부터 진행.
             total_reviews.clear()
 
 

@@ -38,12 +38,9 @@ def review_count_formatter(review_count: WebElement) -> str:
 
 def test():
     # category = 'smartwatch'
-    category = 'extra_battery'
-<<<<<<< HEAD
-    naver_shopping_driver = Driver(headless=False, active_user_agent=False)
-=======
+    category = 'keyboard'
     naver_shopping_driver = Driver(headless=True, active_user_agent=True, get_log=False)
->>>>>>> 38933f8db30f33a8fd13d57e4ffc23bb05855f3b
+    >>>>>>> 38933f8db30f33a8fd13d57e4ffc23bb05855f3b
 
     # 태그 매치
     """https://saucelabs.com/resources/blog/selenium-tips-css-selectors"""
