@@ -1,10 +1,7 @@
 #stdlib
 import json
 import datetime
-<<<<<<< HEAD
-=======
 import os
->>>>>>> 38933f8db30f33a8fd13d57e4ffc23bb05855f3b
 # 3rd party lib.
 from driver.driver import Driver
 from selenium.webdriver.common.by import By
@@ -36,11 +33,10 @@ def grade_formatter(grade_element: WebElement) -> str:
 def review_count_formatter(review_count: WebElement) -> str:
     return review_count.text.replace(",", "").replace("\n", "").replace('(', '').replace(')', '')
 
-def test():
+def product_link_crawler(category:str):
     # category = 'smartwatch'
     category = 'keyboard'
     naver_shopping_driver = Driver(headless=True, active_user_agent=True, get_log=False)
-    >>>>>>> 38933f8db30f33a8fd13d57e4ffc23bb05855f3b
 
     # 태그 매치
     """https://saucelabs.com/resources/blog/selenium-tips-css-selectors"""
@@ -83,7 +79,7 @@ def test():
                 try:
                     a_tag = item.find_element(By.XPATH, ".//div[contains(@class, 'product_title_')]/a")
                     item_dict['url'] = a_tag.get_attribute('href')
-                    item_dict['name'] = a_tag.get_attribute('title')
+                    item_dict['name'] = a_tag.get_attribute('title') # "/ 들어간 거 replace 하게 될수도"
                     items.append(item_dict)
                 except Exception as e:
                     log.error(f'[ERROR] Could not catch product url and name.')
@@ -122,12 +118,10 @@ def test():
     product_dict['items'] = items
 
     current_time = datetime.datetime.now().strftime('%Y%m%d_%Hh%Mm')
-<<<<<<< HEAD
-=======
+    
     if not os.path.exists("./api_call"):
         os.mkdir("./api_call")
     
->>>>>>> 38933f8db30f33a8fd13d57e4ffc23bb05855f3b
     with open(f'./api_call/{current_time}_{category}_product_link.json', 'w', encoding='utf-8-sig') as json_file:
         json.dump(product_dict, json_file, ensure_ascii=False)
         log.info(f"[SUCCESS] Success at {category}")
@@ -137,7 +131,7 @@ def test():
 
 
 if __name__ == '__main__':
-    test()
+    product_link_crawler(category='keyboard')
 
 
 

@@ -10,7 +10,11 @@ import requests
 from io import BytesIO
 from log import Logger
 import re
+import json
 from image_processing.ocr_engine import OCREngine
+
+
+
 hanja_ptrn = re.compile(r'[一-龥]')
 kor_ptrn = re.compile(r'[가-힣]')
 kor_vowel_consonant_ptrn = re.compile(r'[ㄱ-ㅎㅏ-ㅣ]]')
@@ -19,6 +23,8 @@ eng_ptrn = re.compile(r'[a-zA-Z]')
 log = Logger.get_instance()
 ocr_engine = OCREngine.get_instance()
 
+def replace_text(text:str):
+    return text.replace(':',"").replace("|","").rstrip()
 
 # def slice_image_vertically(image_path, gap):
       
@@ -200,28 +206,111 @@ def make_ocr_sequence(image_path, cut_pix_list):
         if not result or not result[0]:
             continue
     
-        # 픽셀을 나눠놨기 때문에 result의 바운딩 박스 y좌표에 gap을 더해줘야함
         for line in result[0]:
             # 글자 이상한 것 체크.
             exist_kor_eng = eng_ptrn.search(line[1][0]) and kor_ptrn.search(line[1][0])
+            exist_eng = eng_ptrn.search(line[1][0])
             exist_hanja = hanja_ptrn.search(line[1][0])
             exist_kor_vowel_consonant = kor_vowel_consonant_ptrn.search(line[1][0])
+            # bbox = line[0]
+            # height = max(bbox[3][1] - bbox[1][1], bbox[2][1] - bbox[0][1]) # 최대 높이 기준. 이게 클수록 OCR이 잘되기에 까다로워지도록 설정.
+            # height_threshold = height / 20
 
+            # kor_eng_height_threshold = height_threshold if height_threshold * 0.91 < 0.92 else 0.91
+            # eng_height_threshold = height_threshold if height_threshold * 0.93 < 0.94 else 0.93
+            
             if exist_hanja or exist_kor_vowel_consonant:
                 continue
             elif (exist_kor_eng 
-                  and line[1][1] < 0.85 # 정확도 체크.
+                  and line[1][1] < 0.91 # 정확도 체크. 
                   ): 
                 continue
-            elif (eng_ptrn 
-                  and line[1][1] < 0.9 # 정확도 체크.
+            elif (exist_eng 
+                  and line[1][1] < 0.92 # 정확도 체크.
                   ):
+                continue
+            elif line[1][1] < 0.89:
                 continue
 
             for ax in line[0]:
                 ax[1]+=cut_line
+
         # 문자와 바운딩박스 좌표를 dict으로 묶어서 리스트에 추가
-            ocr_sequence.append({'text':line[1][0], "bbox":line[0]})
+            ocr_sequence.append({'text': replace_text(line[1][0]), "bbox":line[0]})
+        
+    log.info(f"[SUCCESS] OCR completed.")
+
+    return ocr_sequence
+
+
+def make_ocr_sequence_json(image_path, cut_pix_list):
+    """
+    image_path: img tag src attribute. e.g link of img.
+
+    cut_pix_list: sorted cutline list.
+    """
+
+    if not os.path.exists('./ocr_jsons'):
+        os.mkdir('./ocr_jsons')
+
+    # 이미지 로드
+    if 'http' in image_path:
+        res = requests.get(image_path)
+        image = Image.open(BytesIO(res.content))
+    else:
+        image = Image.open(image_path)
+
+    width = image.size[0]   # 이미지 가로
+
+    ocr_sequence = []
+    
+    for i in range(len(cut_pix_list)-1):
+        cut_line = cut_pix_list[i+1] - cut_pix_list[i]
+        box = (0, cut_pix_list[i], width, cut_pix_list[i+1])
+        cropped_image_arr = np.asarray(image.crop(box), dtype='uint8')
+        result = ocr_engine.ocr(cropped_image_arr, cls=True)
+
+        if not result or not result[0]:
+            continue
+    
+        for line in result[0]:
+            # 글자 이상한 것 체크.
+            exist_kor_eng = eng_ptrn.search(line[1][0]) and kor_ptrn.search(line[1][0])
+            exist_eng = eng_ptrn.search(line[1][0])
+            exist_hanja = hanja_ptrn.search(line[1][0])
+            exist_kor_vowel_consonant = kor_vowel_consonant_ptrn.search(line[1][0])
+            # bbox = line[0]
+            # height = max(bbox[3][1] - bbox[1][1], bbox[2][1] - bbox[0][1]) # 최대 높이 기준. 이게 클수록 OCR이 잘되기에 까다로워지도록 설정.
+            # height_threshold = height / 20
+
+            # kor_eng_height_threshold = height_threshold if height_threshold * 0.91 < 0.92 else 0.91
+            # eng_height_threshold = height_threshold if height_threshold * 0.93 < 0.94 else 0.93
+            
+            if exist_hanja or exist_kor_vowel_consonant:
+                continue
+            elif (exist_kor_eng 
+                  and line[1][1] < 0.91 # 정확도 체크. 
+                  ): 
+                continue
+            elif (exist_eng 
+                  and line[1][1] < 0.92 # 정확도 체크.
+                  ):
+                continue
+            elif line[1][1] < 0.89:
+                continue
+
+            for ax in line[0]:
+                ax[1]+=cut_line
+
+        # 문자와 바운딩박스 좌표를 dict으로 묶어서 리스트에 추가
+            ocr_sequence.append({'text': replace_text(line[1][0]), "bbox":line[0]})
+
+        image_filename = image_path[image_path.rfind("\\")+1:].replace('.jpg', '').replace('.png', '')
+        with open(f'./ocr_jsons/{image_filename}_{i}.json','w', encoding='utf-8-sig') as json_file:
+            json.dump(ocr_sequence, json_file, ensure_ascii=False)
+        
+        ocr_sequence.clear()    
+
     log.info(f"[SUCCESS] OCR completed.")
 
     return ocr_sequence
@@ -247,17 +336,24 @@ def last_OCR_image(folder_name, cut_pix_list):
         for line in result[0]:
             # 글자 이상한 것 체크.
             exist_kor_eng = eng_ptrn.search(line[1][0]) and kor_ptrn.search(line[1][0])
+            exist_eng = eng_ptrn.search(line[1][0])
             exist_hanja = hanja_ptrn.search(line[1][0])
             exist_kor_vowel_consonant = kor_vowel_consonant_ptrn.search(line[1][0])
+            bbox = line[0]
+            height = max(bbox[3][1] - bbox[1][1], bbox[2][1] - bbox[0][1]) # 최대 높이 기준. 이게 클수록 OCR이 잘되기에 까다로워지도록 설정.
+            height_threshold = height / 20
 
+            kor_eng_height_threshold = height_threshold if height_threshold * 0.91 < 0.92 else 0.91
+            eng_height_threshold = height_threshold if height_threshold * 0.93 < 0.94 else 0.93
+            
             if exist_hanja or exist_kor_vowel_consonant:
                 continue
             elif (exist_kor_eng 
-                  and line[1][1] < 0.85 # 정확도 체크.
+                  and line[1][1] < kor_eng_height_threshold # 정확도 체크. 
                   ): 
                 continue
-            elif (eng_ptrn 
-                  and line[1][1] < 0.9 # 정확도 체크.
+            elif (exist_eng 
+                  and line[1][1] < eng_height_threshold # 정확도 체크.
                   ):
                 continue
 
