@@ -22,6 +22,7 @@ from driver.driver import Driver
 from selenium.webdriver.common.by import By
 from bs4 import BeautifulSoup
 from selenium.common.exceptions import NoSuchElementException
+from selenium.common.exceptions import TimeoutException
 
 # custom lib.
 from log import Logger 
@@ -128,7 +129,12 @@ def fetch_product_details(driver:Driver):
     try:
         driver.wait_until_by_xpath(3, ".//p[contains(@class, 'imageSpecInfo_provide_')]")
     except:
-        driver.wait_until_by_xpath(3, ".//p[contains(@class, 'specInfo_provide_')]")
+        try:
+            driver.wait_until_by_xpath(3, ".//p[contains(@class, 'specInfo_provide_')]") # 이미지 스펙 없는 경우.
+        except TimeoutException:
+            log.info(f"[WARNING] There is no product details.")
+    
+
     
 
     # 일반적인 이미지 스펙 추출 가능한지 확인.
@@ -137,17 +143,20 @@ def fetch_product_details(driver:Driver):
     except:
         # 안되면 naver spec.
         log.info(f"[INFO] No export spec at here.")
-        tables = driver.driver.find_elements(By.XPATH, ".//div[contains(@class, 'attribute_product_attribute_')]/table")
-        for table in tables:
-            table_rows = table.find_elements(By.XPATH, ".//tr")
-            for row in table_rows:
-                keys = row.find_elements(By.XPATH, ".//th")
-                vals = row.find_elements(By.XPATH, ".//td")
-                for key, val in zip(keys, vals):
-                    naver_spec[key.text] = {
-                                        'text': val.text, 
-                                        'location': [val.location['y'], val.location['x']]
-                                        }
+        try:
+            tables = driver.driver.find_elements(By.XPATH, ".//div[contains(@class, 'attribute_product_attribute_')]/table")
+            for table in tables:
+                table_rows = table.find_elements(By.XPATH, ".//tr")
+                for row in table_rows:
+                    keys = row.find_elements(By.XPATH, ".//th")
+                    vals = row.find_elements(By.XPATH, ".//td")
+                    for key, val in zip(keys, vals):
+                        naver_spec[key.text] = {
+                                            'text': val.text, 
+                                            'location': [val.location['y'], val.location['x']]
+                                            }
+        except:
+            log.info(f"[WARNING] There is no product details.")
                 
     # brand content banner 존재 시.
     # TODO: # 사진 가져오고, 이후 병렬처리 (multiprocessing)    
@@ -191,7 +200,7 @@ def get_review_log(driver: Driver):
 
 def review_formatter(reviews:list[dict]) -> None:
     # remain_key = ['id', 'content', 'aidaModifyTime', 'mallId', 'mallSeq', 'matchNvMid', 'qualityScore', 'starScore', 'topicCount', "topicYn", 'topics', 'userId', 'mallName']    
-    keys_to_remove = ["buyOption", "aidaCreateTime", "esModifyTime", "modifyDate", "pageUrl", "registerDate", "imageCount", "imageYn", "images", "mallProductId", "mallReviewId", "rankScore", "title", "videoCount", "videoYn", "videos", "mallLogoUrl"]
+    keys_to_remove = ["aidaCreateTime", "esModifyTime", "modifyDate", "pageUrl", "registerDate", "imageCount", "imageYn", "images", "mallProductId", "mallReviewId", "rankScore", "title", "videoCount", "videoYn", "videos", "mallLogoUrl"]
     for review in reviews:
         for key in keys_to_remove:
             review.pop(key)
@@ -220,15 +229,20 @@ def flush_log(driver:Driver):
     driver.driver.get_log('performance')
 
 
-def test():
-    naver_shopping_driver = Driver(headless=True, active_user_agent=True, get_log=True)
+def review_crawler():
+    naver_shopping_driver = Driver(headless=False, active_user_agent=False, get_log=True)
     product_links, product_names, category = get_links("./api_call/20240402_04h11m_keyboard_product_link.json")
-
+    # flag = False
     for link, name in zip(product_links, product_names):
         # 원래는 크롤링한 사이트 링크들.
+        # if flag or name == "데이비드테크 엔보우 N패드 네오":
+        #     flag = True
+        # else:
+        #     continue
+
         
         naver_shopping_driver.get(link) 
-        # TODO: Test cases:
+        # TODO: test cases:
         # 디알고 헤드셋. 적은 평점.
         # naver_shopping_driver.get("https://search.shopping.naver.com/catalog/36974003618?adId=nad-a001-02-000000223025435&channel=nshop.npla&cat_id=%EB%94%94%EC%A7%80%ED%84%B8/%EA%B0%80%EC%A0%84&NaPm=ct%3Dlu2l3ulc%7Cci%3D0zW0003ypdPztN%5FoFfjw%7Ctr%3Dpla%7Chk%3Dc6b52bbfde6b3967102cd5b772f10fb97a2d3356&cid=0zW0003ypdPztN_oFfjw")
         # 어프어프. 리뷰 없음.
@@ -242,6 +256,7 @@ def test():
         except:
             if naver_shopping_driver.driver.find_element(By.XPATH, ".//div[contains(@class, 'content_error')]"):
                 log.warning("[WARNING] IP Blocked.")
+                return
                 # 이후 prodxy ip 바꿔서 naver_shopping_driver 다시 얻어야 함.
 
 
@@ -262,10 +277,10 @@ def test():
         except:
             log.warning("[WARNING] No see more button.")
         
-        # 제품 상세에서 ocr 및 location 따기.
-        naver_spec, seller_spec = fetch_product_details(naver_shopping_driver)
-        with open('specs.json', 'a', encoding='utf-8-sig') as json_file:
-            json.dump({"naver_spec": naver_spec, "seller_spec": seller_spec}, json_file, ensure_ascii=False)
+        # 제품 상세에서 ocr 및 location 따기. 이건 상황에 따라...
+        # naver_spec, seller_spec = fetch_product_details(naver_shopping_driver)
+        # with open('specs.json', 'a', encoding='utf-8-sig') as json_file:
+        #     json.dump({"naver_spec": naver_spec, "seller_spec": seller_spec}, json_file, ensure_ascii=False)
 
         # 제품 네이버 스펙 보러가기.
         spec = fetch_spec(naver_shopping_driver)            
@@ -317,9 +332,6 @@ def test():
                     
                     log.info(f"[INFO] Current page_num: {page_num}")
 
-                    if page_num == 100:
-                        print("")
-
                     naver_shopping_driver.move_to_element(element=review_page)
                     review_page.click()
 
@@ -345,16 +357,17 @@ def test():
             with open(f'./reviews/{current_time}_{category}_{name}_review.json', 'w', encoding='utf-8-sig') as json_file:
                 log.info("Review data from JSON file completed.")
                 json.dump(total_reviews, json_file, ensure_ascii=False)
-            # keyboard_COX CK108 블랙/다크그레이 게이트론 LED 게이밍 기계식 키보드_review.json
-            # 부터 진행.
+            
             total_reviews.clear()
+        
+        log.info(f"[SUCCESS] {name} crawled complete.")
 
 
     naver_shopping_driver.release()
 
 
 if __name__ == '__main__':    
-    test()
+    review_crawler()
 
 
 

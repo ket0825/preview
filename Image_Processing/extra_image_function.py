@@ -1,10 +1,15 @@
-from paddleocr import PaddleOCR,draw_ocr
+from paddleocr import PaddleOCR, draw_ocr
 from PIL import Image
 import numpy as np
-import matplotlib.pyplot as plt
-import pandas as pd
 import os
 import shutil
+import re
+
+hanja_ptrn = re.compile(r'[一-龥]')
+kor_ptrn = re.compile(r'[가-힣]')
+kor_vowel_consonant_ptrn = re.compile(r'[ㄱ-ㅎㅏ-ㅣ]]')
+eng_ptrn = re.compile(r'[a-zA-Z]')
+
 def RGB_extract(image_path):
     image_path=image_path
     img=Image.open(image_path)
@@ -45,9 +50,8 @@ def slice_image_vertically(image_path, folder_name, gap):
     return height
 
 
-def OCR_image(folder_name, result_folder_name, gap):
+def OCR_image(folder_name, gap, result_folder_name='result_image'):
     # ocr 결과 사진 저장할 폴더 생성
-    result_folder_name = 'result_image'
     if not os.path.exists(result_folder_name):
         os.makedirs(result_folder_name)
     # 문자 OCR
@@ -61,26 +65,61 @@ def OCR_image(folder_name, result_folder_name, gap):
         image_path=os.path.join(folder_name, image_index)
         # ocr 수행
         result=ocr.ocr(image_path, cls=False)
-        
+        boxes = []
+        txts = []
+        scores = []
         # print("[최초 ocr 결과]")
         # for line in result[0]:
         #     print(line)
+        if result[0] == None or not result:
+            continue
 
         # ocr 결과 이미지 저장
         image = Image.open(image_path).convert('RGB')
-        boxes = [line[0] for line in result[0]]
-        txts = [line[1][0] for line in result[0]]
-        scores = [line[1][1] for line in result[0]]
+
+        for line in result[0]:
+            # 글자 이상한 것 체크.
+            exist_kor_eng = eng_ptrn.search(line[1][0]) and kor_ptrn.search(line[1][0])
+            exist_eng = eng_ptrn.search(line[1][0])
+            exist_hanja = hanja_ptrn.search(line[1][0])
+            exist_kor_vowel_consonant = kor_vowel_consonant_ptrn.search(line[1][0])
+            # bbox = line[0]
+            # height = max(bbox[3][1] - bbox[1][1], bbox[2][1] - bbox[0][1]) # 최대 높이 기준. 이게 클수록 OCR이 잘되기에 까다로워지도록 설정.
+            # height_threshold = height / 20
+
+            # kor_eng_height_threshold = height_threshold if height_threshold * 0.91 < 0.92 else 0.91
+            # eng_height_threshold = height_threshold if height_threshold * 0.93 < 0.94 else 0.93
+            
+            if exist_hanja or exist_kor_vowel_consonant:
+                continue
+            elif (exist_kor_eng 
+                  and line[1][1] < 0.91 # 정확도 체크. 
+                  ): 
+                continue
+            elif (exist_eng 
+                  and line[1][1] < 0.92 # 정확도 체크.
+                  ):
+                continue
+            elif line[1][1] < 0.89:
+                continue
+
+            boxes.append(line[0])
+            txts.append(line[1][0])
+            scores.append(line[1][1])
+
+            for ax in line[0]:
+                ax[1]+=gap
+        
+            ocr_sequence.append({'text':line[1][0], 'bbox': line[0]})
+
         im_show = draw_ocr(image, boxes, txts, scores, font_path='malgun.ttf')
         im_show = Image.fromarray(im_show)
         im_show.save(os.path.join(result_folder_name, image_index))
         
         # print("*"*100)
-        
+    
         # 픽셀을 나눠놨기 때문에 result의 바운딩 박스 y좌표에 gap을 더해줘야함
-        for line in result[0]:
-            for ax in line[0]:
-                ax[1]+=gap*cnt
+        
         
         # 텍스트만 뽑히는지
         # print("[텍스트만 뽑히는지 확인]")
@@ -93,20 +132,21 @@ def OCR_image(folder_name, result_folder_name, gap):
         #     print(line)
         
         # 좌표랑 텍스트 튜플로 묶어서 리스트에 저장
-        for line in result[0]:
-            pair=(line[1][0], line[0])
-            ocr_sequence.append(pair)
+        
+        # for line in result[0]:
+        #     pair=(line[1][0], line[0])
+        #     ocr_sequence.append(pair)
 
 
     # 임시로 만들었던 폴더 제거
-    if os.path.exists(folder_name):
-        for file_name in os.listdir(folder_name):
-            file_path = os.path.join(folder_name, file_name)
-            if os.path.isfile(file_path):
-                os.unlink(file_path)
-            elif os.path.isdir(file_path):
-                shutil.rmtree(file_path)
-        os.rmdir(folder_name)
+    # if os.path.exists(folder_name):
+    #     for file_name in os.listdir(folder_name):
+    #         file_path = os.path.join(folder_name, file_name)
+    #         if os.path.isfile(file_path):
+    #             os.unlink(file_path)
+    #         elif os.path.isdir(file_path):
+    #             shutil.rmtree(file_path)
+    #     os.rmdir(folder_name)
 
     # 임시로 만들었던 폴더 제거
     if os.path.exists(result_folder_name):
