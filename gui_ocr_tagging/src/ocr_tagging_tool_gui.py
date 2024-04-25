@@ -79,13 +79,58 @@ def display_content(ocr_data):
         new_frame.pack(pady=5)
         topic_frames.append(new_frame)
 
-        topic_text = tk.Text(new_frame, height=2, width=30)
+        topic_text = tk.Text(new_frame, height=2, width=40)
         topic_text.insert(tk.END, topic_data['text'])
         topic_text.config(font=('Times New Roman', 12))
         topic_text.pack(side=tk.LEFT, padx=5)
         topic_entry.append(topic_text)
 
-        topic_combobox = ttk.Combobox(new_frame, values=["기능", "발열", "디자인", "포장 상태"], state="normal")
+        topic_combobox = ttk.Combobox(new_frame, values=[
+            "디자인",
+                    "커스터마이징",
+                    "그립감",
+                    "색감",
+                    "로고없음",
+                "안전",
+                    "인증",
+                    "발열",
+                    "과충전방지",
+                    "과전류",
+                "서비스",
+                    "AS",
+                        "환불",
+                        "문의",
+                        "교환",
+                        "수리",
+                    "보험",
+                    "배송",
+                "기능",
+                    "멀티포트",
+                    "거치",
+                    "잔량표시",
+                    "충전표시",
+                    "충전",
+                        "고속충전",
+                        "동시충전",
+                        "저전력",
+                        "무선충전"
+                            "맥세이프",                        
+                    "배터리충전속도",
+                "휴대성",
+                    "사이즈",
+                    "무게",
+                "호환성",
+                "배터리용량",
+                "기타",
+                    "기내반입",
+                    "수명",
+                    "친환경",
+                    "구성품",
+                        "케이블",
+                        "파우치",
+                        "케이스"
+                    ], state="normal")
+        topic_combobox.bind('<MouseWheel>', lambda event: 'break')
         topic_combobox.set(topic_data['topic'])
         topic_combobox.pack(side=tk.LEFT, padx=5)
         topic_entry.append(topic_combobox)
@@ -95,7 +140,7 @@ def display_content(ocr_data):
 def save_json_file():
     global current_index, data, file_path, topic_entries, ocr_topics
     try:
-        if data > 0 and file_path:
+        if len(data) > 0 and file_path:
             save_to_ocr_topics()
 
             # clean ocr_topics
@@ -171,11 +216,60 @@ def add_topic():
     topic_text.config(font=('Times New Roman', 12))
     topic_entry.append(topic_text)
 
-    topic_combobox = ttk.Combobox(new_frame, values=["기능", "발열", "디자인", "포장 상태"], state="normal")
+    topic_combobox = ttk.Combobox(new_frame, values=[
+                "디자인",
+                    "커스터마이징",
+                    "그립감",
+                    "색감",
+                    "로고없음",
+                "안전",
+                    "인증",
+                    "발열",
+                    "과충전방지",
+                    "과전류",
+                "서비스",
+                    "AS",
+                        "환불",
+                        "문의",
+                        "교환",
+                        "수리",
+                    "보험",
+                    "배송",
+                "기능",
+                    "멀티포트",
+                    "거치",
+                    "잔량표시",
+                    "충전표시",
+                    "충전",
+                        "고속충전",
+                        "동시충전",
+                        "저전력",
+                        "무선충전"
+                            "맥세이프",                        
+                    "배터리충전속도",
+                "휴대성",
+                    "사이즈",
+                    "무게",
+                "호환성",
+                "배터리용량",
+                "기타",
+                    "기내반입",
+                    "수명",
+                    "친환경",
+                    "구성품",
+                        "케이블",
+                        "파우치",
+                        "케이스"
+                    ], state="normal")
+    topic_combobox.bind('<MouseWheel>', lambda event: 'break')
     topic_combobox.pack(side=tk.LEFT, padx=5)
     topic_entry.append(topic_combobox)
 
     topic_entries.append(topic_entry)
+
+     # Canvas 크기 업데이트
+    inner_frame.update_idletasks()
+    topic_canvas.config(scrollregion=topic_canvas.bbox('all'))
 
 def delete_last_topic():
     global topic_entries, file_path
@@ -198,7 +292,7 @@ def delete_last_topic():
 
 
 def create_new_topic_frame():
-    return tk.Frame(topic_frame)
+    return tk.Frame(inner_frame)
 
 def save_to_ocr_topics():
     global current_index, data, topic_entries, ocr_topics
@@ -219,6 +313,7 @@ def save_to_ocr_topics():
 
 
 root = tk.Tk()
+root.geometry("850x700")
 root.title("JSON File Editor")
 
 # 경로 프레임.
@@ -264,9 +359,37 @@ scrolled_text = scrolledtext.ScrolledText(text_frame, width=80, height=20)
 scrolled_text.config(font=('Times New Roman', 14))
 scrolled_text.pack(fill=tk.BOTH, expand=True)
 
-# topic frame.
+# topic frame
 topic_frame = tk.Frame(root)
-topic_frame.pack(ipadx=100, expand=True)
+topic_frame.pack(fill=tk.BOTH, expand=True)
+
+# Scrollbar 생성
+topic_scroll = tk.Scrollbar(topic_frame)
+topic_scroll.pack(side=tk.RIGHT, fill=tk.Y)
+
+# Canvas 생성
+topic_canvas = tk.Canvas(topic_frame, yscrollcommand=topic_scroll.set)
+topic_canvas.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
+
+# Scrollbar 구현
+topic_scroll.config(command=topic_canvas.yview)
+
+# Canvas 내부에 Frame 생성
+inner_frame = tk.Frame(topic_canvas)
+topic_canvas.create_window((0, 0), window=inner_frame, anchor='nw')
+
+# 스크롤 영역 업데이트
+inner_frame.bind('<Configure>', lambda event: topic_canvas.configure(scrollregion=topic_canvas.bbox('all')))
+
+# 마우스 호버 이벤트 바인딩
+topic_canvas.bind('<Enter>', lambda event: topic_canvas.focus_set())
+topic_canvas.bind('<Leave>', lambda event: topic_canvas.master.focus_set())
+
+# 마우스 휠 이벤트 처리
+def on_mouse_wheel(event):
+    topic_canvas.yview_scroll(-1 * (event.delta // 120), "units")
+
+topic_canvas.bind_all('<MouseWheel>', on_mouse_wheel)
 
 # topic label.
 topic_lbl = tk.Label(topic_frame, text="    Text    //    topic    ")
@@ -282,8 +405,8 @@ delete_topic_btn = tk.Button(topic_frame, text="Delete Last Topic", command=dele
 delete_topic_btn.pack(side=tk.LEFT, padx=8)
 
 # 페이지 index frame.
-page_index_frame = tk.Frame(root)
-page_index_frame.pack(side=tk.BOTTOM, pady=5)
+page_index_frame = tk.Frame(topic_frame)
+page_index_frame.pack(side=tk.TOP, pady=5)
 
 # 페이지 index label.
 page_index_lbl = tk.Label(page_index_frame)
