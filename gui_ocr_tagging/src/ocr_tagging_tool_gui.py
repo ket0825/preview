@@ -143,16 +143,26 @@ def save_json_file():
         if len(data) > 0 and file_path:
             save_to_ocr_topics()
 
-            # clean ocr_topics
-            to_topic_delete = ocr_topics.copy()
-            for idx, topics in enumerate(to_topic_delete):
-                for idx_topic, topic in enumerate(topics):
-                    if (topic['text'] == "" 
-                        or topic['topic'] == "" 
-                        or topic['start_pos'] == -1 
-                        or topic['end_pos'] == -1
-                        ):
-                        ocr_topics[idx].pop(idx_topic)
+            # # clean ocr_topics
+            # to_topic_delete = ocr_topics.copy()
+            # for idx, topics in enumerate(to_topic_delete):
+            #     for idx_topic, topic in enumerate(topics):
+            #         if (topic['text'] == "" 
+            #             or topic['topic'] == "" 
+            #             or topic['start_pos'] == -1 
+            #             or topic['end_pos'] == -1
+            #             ):
+            #             ocr_topics[idx].remove(topic)
+
+             # clean our_topics
+            for idx in range(len(ocr_topics)):
+                ocr_topics[idx] = [dict_topic for dict_topic in ocr_topics[idx] 
+                                  if (dict_topic['start_pos'] != -1 
+                                      and dict_topic['end_pos'] != -1 
+                                      and dict_topic['text'] != "" 
+                                      and dict_topic['topic'] != "")
+                                      ]                
+
             for idx, datum in enumerate(data):
                 # 존재해야만 한다.
                 if (isinstance(ocr_topics[idx], list) # list 형태이고
