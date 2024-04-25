@@ -149,6 +149,16 @@ def save_json_file():
     try:
         if data and file_path:
             save_to_our_topics()
+
+             # clean our_topics
+            for idx in range(len(our_topics)):
+                our_topics[idx] = [dict_topic for dict_topic in our_topics[idx] 
+                                  if (dict_topic['start_pos'] != -1 
+                                      and dict_topic['end_pos'] != -1 
+                                      and dict_topic['text'] != "" 
+                                      and dict_topic['topic'] != "")
+                                      ]     
+                
             for idx, datum in enumerate(data):
                 datum['our_topics'] = our_topics[idx]
             with open(file_path, 'w', encoding='utf-8-sig') as f:

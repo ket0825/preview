@@ -94,8 +94,9 @@ def display_content(content_data):
                                                     "기능",
                                                         "멀티포트",
                                                         "거치",
-                                                        "잔량표시",
-                                                        "충전표시",
+                                                        "디스플레이",
+                                                            "잔량표시",
+                                                            "충전표시",
                                                         "충전",
                                                             "고속충전",
                                                             "동시충전",
@@ -147,6 +148,15 @@ def save_json_file():
     try:
         if data and file_path:
             save_to_our_topics()
+             # clean our_topics
+            for idx, our_topic in enumerate(our_topics):
+                our_topics[idx] = [dict_topic for dict_topic in our_topics[idx] 
+                                  if (dict_topic['start_pos'] != -1 
+                                      and dict_topic['end_pos'] != -1 
+                                      and dict_topic['text'] != "" 
+                                      and dict_topic['topic'] != "")
+                                      ]                
+                
             for idx, datum in enumerate(data):
                 datum['our_topics'] = our_topics[idx]
             with open(file_path, 'w', encoding='utf-8-sig') as f:
@@ -224,8 +234,9 @@ def add_topic():
                                                     "기능",
                                                         "멀티포트",
                                                         "거치",
-                                                        "잔량표시",
-                                                        "충전표시",
+                                                        "디스플레이",
+                                                            "잔량표시",
+                                                            "충전표시",
                                                         "충전",
                                                             "고속충전",
                                                             "동시충전",
