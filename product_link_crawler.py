@@ -18,7 +18,7 @@ PAGE_NUM = 5
 
 
 def price_formatter(price_element: WebElement) -> str:
-    return price_element.text.replace(",", "").replace("원", "")
+    return int(price_element.text.replace(",", "").replace("원", ""))
 
 def grade_formatter(grade_element: WebElement) -> str:
     grade_str = ""
@@ -28,10 +28,10 @@ def grade_formatter(grade_element: WebElement) -> str:
     except:
         grade_str =  grade_element.text
     
-    return grade_str
+    return round(float(grade_str),2)
 
 def review_count_formatter(review_count: WebElement) -> str:
-    return review_count.text.replace(",", "").replace("\n", "").replace('(', '').replace(')', '')
+    return int(review_count.text.replace(",", "").replace("\n", "").replace('(', '').replace(')', ''))
 
 def product_link_crawler(category:str):
     # category = 'smartwatch'
@@ -116,6 +116,7 @@ def product_link_crawler(category:str):
 
     product_dict['end_page'] = naver_shopping_driver.page
     product_dict['items'] = items
+    product_dict['type'] = "P0"
 
     current_time = datetime.datetime.now().strftime('%Y%m%d_%Hh%Mm')
     
