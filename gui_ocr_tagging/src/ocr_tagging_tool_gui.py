@@ -10,6 +10,68 @@ ocr_topics = []
 file_path = ""
 data_len = 0
 
+topic_candidates = [
+                    "디자인",
+                        "커스터마이징",
+                        "그립감",
+                        "색감",
+                        "로고없음",
+                        "재질",
+                    "안전",
+                        "인증",
+                        "발열",
+                        "과충전방지",
+                        "과전류",
+                    "서비스",
+                        "AS",
+                            "환불",
+                            "문의",
+                            "교환",
+                            "수리",
+                        "보험",
+                        "배송/포장/발송",
+                    "기능",
+                        "멀티포트",
+                        "거치",
+                        "부착",
+                        "디스플레이",
+                            "잔량표시",
+                            "충전표시",
+                        "충전",
+                            "고속충전",
+                            "동시충전",
+                            "저전력",
+                            "무선충전",
+                                "맥세이프",                        
+                        "배터리충전속도",
+                    "휴대성",
+                        "사이즈",
+                        "무게",
+                    "배터리를충전하는호환성",
+                    "배터리용량",
+                    "기타",
+                        "기내반입",
+                        "수명",
+                        "친환경",
+                        "구성품",
+                            "케이블",
+                            "파우치",
+                            "케이스"
+                    ]
+
+def on_keyrelease(event, topic_combobox):
+    # 입력된 값 가져오기
+    value = event.widget.get()
+    # 입력된 값으로 시작하는 항목들로 콤보박스 업데이트
+    if value == '':
+        topic_combobox['values'] = topic_candidates
+    else:
+        data = []
+        for item in topic_candidates:
+            if value in item:
+                data.append(item)
+        topic_combobox['values'] = data
+
 
 def open_json_file():
     global current_index, data, file_path, ocr_topics, data_len
@@ -85,54 +147,12 @@ def display_content(ocr_data):
         topic_text.pack(side=tk.LEFT, padx=5)
         topic_entry.append(topic_text)
 
-        topic_combobox = ttk.Combobox(new_frame, values=[
-            "디자인",
-                    "커스터마이징",
-                    "그립감",
-                    "색감",
-                    "로고없음",
-                "안전",
-                    "인증",
-                    "발열",
-                    "과충전방지",
-                    "과전류",
-                "서비스",
-                    "AS",
-                        "환불",
-                        "문의",
-                        "교환",
-                        "수리",
-                    "보험",
-                    "배송",
-                "기능",
-                    "멀티포트",
-                    "거치",
-                    "잔량표시",
-                    "충전표시",
-                    "충전",
-                        "고속충전",
-                        "동시충전",
-                        "저전력",
-                        "무선충전"
-                            "맥세이프",                        
-                    "배터리충전속도",
-                "휴대성",
-                    "사이즈",
-                    "무게",
-                "호환성",
-                "배터리용량",
-                "기타",
-                    "기내반입",
-                    "수명",
-                    "친환경",
-                    "구성품",
-                        "케이블",
-                        "파우치",
-                        "케이스"
-                    ], state="normal")
-        topic_combobox.bind('<MouseWheel>', lambda event: 'break')
+        topic_combobox = ttk.Combobox(new_frame, values=topic_candidates, state="normal")
+        topic_combobox.bind('<MouseWheel>', lambda event: 'break')        
         topic_combobox.set(topic_data['topic'])
-        topic_combobox.pack(side=tk.LEFT, padx=5)
+        # 콤보박스에 키 이벤트 바인딩
+        topic_combobox.bind('<KeyRelease>', lambda e: on_keyrelease(e, topic_combobox))
+        topic_combobox.pack(side=tk.LEFT, padx=10)
         topic_entry.append(topic_combobox)
 
         topic_entries.append(topic_entry)
@@ -178,7 +198,8 @@ def save_json_file():
             msgbox.showinfo("저장성공",  "성공적으로 저장되었습니다!")
         else:
             msgbox.showerror("에러","데이터가 없습니다. 저장에 실패했어요")    
-    except:
+    except Exception as e:
+        print(f"[ERROR] {e}")
         msgbox.showerror("에러","파일 경로나 데이터가 없습니다")
 
 
@@ -226,58 +247,16 @@ def add_topic():
     topic_text.config(font=('Times New Roman', 12))
     topic_entry.append(topic_text)
 
-    topic_combobox = ttk.Combobox(new_frame, values=[
-                "디자인",
-                    "커스터마이징",
-                    "그립감",
-                    "색감",
-                    "로고없음",
-                "안전",
-                    "인증",
-                    "발열",
-                    "과충전방지",
-                    "과전류",
-                "서비스",
-                    "AS",
-                        "환불",
-                        "문의",
-                        "교환",
-                        "수리",
-                    "보험",
-                    "배송",
-                "기능",
-                    "멀티포트",
-                    "거치",
-                    "잔량표시",
-                    "충전표시",
-                    "충전",
-                        "고속충전",
-                        "동시충전",
-                        "저전력",
-                        "무선충전"
-                            "맥세이프",                        
-                    "배터리충전속도",
-                "휴대성",
-                    "사이즈",
-                    "무게",
-                "호환성",
-                "배터리용량",
-                "기타",
-                    "기내반입",
-                    "수명",
-                    "친환경",
-                    "구성품",
-                        "케이블",
-                        "파우치",
-                        "케이스"
-                    ], state="normal")
-    topic_combobox.bind('<MouseWheel>', lambda event: 'break')
-    topic_combobox.pack(side=tk.LEFT, padx=5)
+    topic_combobox = ttk.Combobox(new_frame, values=topic_candidates, state="normal")
+    topic_combobox.bind('<MouseWheel>', lambda event: 'break')            
+    # 콤보박스에 키 이벤트 바인딩
+    topic_combobox.bind('<KeyRelease>', lambda e: on_keyrelease(e, topic_combobox))
+    topic_combobox.pack(side=tk.LEFT, padx=10)
     topic_entry.append(topic_combobox)
 
     topic_entries.append(topic_entry)
 
-     # Canvas 크기 업데이트
+    # Canvas 크기 업데이트
     inner_frame.update_idletasks()
     topic_canvas.config(scrollregion=topic_canvas.bbox('all'))
 
@@ -324,7 +303,7 @@ def save_to_ocr_topics():
 
 root = tk.Tk()
 root.geometry("850x700")
-root.title("JSON File Editor")
+root.title("OCR Tagging Editor")
 
 # 경로 프레임.
 path_frame = tk.Frame(root)
