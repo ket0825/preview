@@ -186,11 +186,15 @@ def save_json_file():
             for idx, datum in enumerate(data):
                 # 존재해야만 한다.
                 if (isinstance(ocr_topics[idx], list) # list 형태이고
-                    and ocr_topics[idx]): # 빈 리스트가 아니라면.
+                    and ocr_topics[idx] # 빈 리스트가 아니라면.
+                    and isinstance(datum[1], list)
+                    ): 
                     datum[1] = ocr_topics[idx]
-                else:
-                    if ocr_topics[idx]: # 빈 리스트가 아니라면.
-                        datum.insert(1, ocr_topics[idx])
+                elif (isinstance(ocr_topics[idx], list) 
+                      and ocr_topics[idx]
+                      and not isinstance(datum[1], list) # list 형태가 아니라면.
+                      ):                    
+                    datum.insert(1, ocr_topics[idx])
 
             with open(file_path, 'w', encoding='utf-8-sig') as f:
                 json.dump(data, f, ensure_ascii=False, indent=4)
