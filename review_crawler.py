@@ -3,13 +3,6 @@
 # XPATH 예시들.
 """https://selenium-python.readthedocs.io/locating-elements.html"""
 
-# TODO:
-"""
-남은 것: 
-1. IP 밴 먹기 예외 처리.
-2. OCR 처리.
-"""
-
 #stdlib
 import json
 import time
@@ -17,6 +10,8 @@ import random
 import datetime
 import re
 import os
+from argparse import ArgumentParser
+
 # 3rd party lib.
 from driver.driver import Driver
 from selenium.webdriver.common.by import By
@@ -28,8 +23,11 @@ from selenium.common.exceptions import TimeoutException
 from log import Logger 
 from image_processing.ocr_engine import OCREngine
 from image_processing.image_function_main import char_pix_extract, make_ocr_sequence
+from route_handler.route_handler import RouteHandler
+
 
 log = Logger.get_instance()
+route_handler = RouteHandler()
 
 global total_reviews
 total_reviews = []
@@ -44,7 +42,8 @@ def get_links(path:str) -> list:
         links = [item['url'] for item in product_raw_json['items']]
         product_names = [item['name'] for item in product_raw_json['items']]
         category = product_raw_json['category']
-        return links, product_names, category, 
+        match_nv_mids = [item['match_nv_mid'] for item in product_raw_json['items']]
+        return links, product_names, category, match_nv_mids
 
 
 def ocr_function(src):
@@ -229,11 +228,22 @@ def flush_log(driver:Driver):
     driver.driver.get_log('performance')
 
 
-def review_crawler():
-    naver_shopping_driver = Driver(headless=False, active_user_agent=False, get_log=True)
-    product_links, product_names, category = get_links("./api_call/20240402_04h11m_keyboard_product_link.json")
+def review_crawler(category:str, type:str,
+                    headless=False, 
+                    active_user_agent=False, 
+                    use_proxy=False) -> None:
+    
+    naver_shopping_driver = Driver(headless=headless, active_user_agent=active_user_agent, use_proxy=use_proxy, get_log=True)        
+    
+    # s_category_row = route_handler.get_category(s_category=category)
+    # caid = s_category_row[0]['caid']    
+
+    # products = route_handler.get_product(caid=caid)
+
+    product_links, product_names, category, match_nv_mids = get_links("./api_call/20240402_04h11m_keyboard_product_link.json")
+    
     # flag = False
-    for link, name in zip(product_links, product_names):
+    for link, name, match_nv_mid in zip(product_links, product_names, match_nv_mids):
         # 원래는 크롤링한 사이트 링크들.
         # if flag or name == "데이비드테크 엔보우 N패드 네오":
         #     flag = True
@@ -367,7 +377,25 @@ def review_crawler():
 
 
 if __name__ == '__main__':    
-    review_crawler()
+    parser = ArgumentParser(description='Review crawler for naver shopping. Enter the category.')
+    parser.add_argument('category', type=str, help='Enter the category you want to crawl.', default="keyboard")
+    parser.add_argument('--headless', type=bool, help='Set headless mode.', default=False)
+    parser.add_argument('--use_proxy', type=bool, help='Set use proxy ip.', default=False)
+    parser.add_argument('--active_user_agent', type=bool, help='Active user agent.', default=False)
+    parser.add_argument('--type', type=str, help='Enter the type.', default="R0")
+
+    args = parser.parse_args() 
+
+    log.info(f"[INFO] Start crawling at {args.category}")
+    log.info(f"[INFO] Headless: {args.headless}, Use proxy: {args.use_proxy}, Active user agent: {args.active_user_agent}")
+    review_crawler(category=args.category, headless=args.headless, 
+                         active_user_agent=args.active_user_agent, 
+                         use_proxy=args.use_proxy,
+                         type=args.type)    
+    log.info(f"[SUCCESS] Success at {args.category}")
+    
+    
+
 
 
 
