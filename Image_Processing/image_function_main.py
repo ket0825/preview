@@ -179,9 +179,8 @@ def char_pix_extract(image_path):
         
     return sorted(result_pix_set)
 
-
 # 찾은 임계값 기준으로 이미지 자르고 ocr 돌리기.
-def make_ocr_sequence(image_path, cut_pix_list):
+def make_ocr_sequence(image_path, cut_pix_list, width_threshold=150, height_threshold=100):
     """
     image_path: img tag src attribute. e.g link of img.
 
@@ -196,7 +195,8 @@ def make_ocr_sequence(image_path, cut_pix_list):
         image = Image.open(image_path)
 
     width = image.size[0]   # 이미지 가로
-    
+
+    prev_bbox = None
     for i in range(len(cut_pix_list)-1):
         cut_line = cut_pix_list[i+1] - cut_pix_list[i]
         box = (0, cut_pix_list[i], width, cut_pix_list[i+1])
@@ -204,10 +204,11 @@ def make_ocr_sequence(image_path, cut_pix_list):
         result = ocr_engine.ocr(cropped_image_arr, cls=True)
 
         if not result or not result[0]:
-            continue
-    
+            continue        
+        image_data = []
+        json_text_list = []
         for line in result[0]:
-            # 글자 이상한 것 체크.
+            # 글자 이상한 것 체크.            
             exist_kor_eng = eng_ptrn.search(line[1][0]) and kor_ptrn.search(line[1][0])
             exist_eng = eng_ptrn.search(line[1][0])
             exist_hanja = hanja_ptrn.search(line[1][0])
@@ -234,10 +235,25 @@ def make_ocr_sequence(image_path, cut_pix_list):
 
             for ax in line[0]:
                 ax[1]+=cut_line
+            
+            bbox = line[0]
+            # Not the first line
+            if prev_bbox is not None and json_text_list:
+                over_width_threshold = bbox[0][0] - prev_bbox[2][0]  > width_threshold
+                over_height_threshold = bbox[0][1] - prev_bbox[2][1]  > height_threshold                
+
+                if (over_width_threshold or over_height_threshold):  
+                    json_text_list[-1]+=("\n")
+
+            json_text_list.append(replace_text(line[1][0]))
+            prev_bbox = bbox            
 
         # 문자와 바운딩박스 좌표를 dict으로 묶어서 리스트에 추가
-            ocr_sequence.append({'text': replace_text(line[1][0]), "bbox":line[0]})
+            image_data.append({'text': replace_text(line[1][0]), "bbox":line[0]})
         
+        image_data.insert(0, " ".join(json_text_list))
+        ocr_sequence.append(image_data)    
+
     log.info(f"[SUCCESS] OCR completed.")
 
     return ocr_sequence
@@ -263,6 +279,13 @@ def make_ocr_sequence_json(image_path, cut_pix_list):
     width = image.size[0]   # 이미지 가로
 
     ocr_sequence = []
+    height_sequence = []
+    tortion_sequence = []
+    ocr_sequence_text = ""
+    height_sequence_text = ""
+    tortion_sequence_text = ""
+    # .만 임의로 넣어주고.
+    # tagging을 한 이후로 다시 돌려서 중요한 정보들만 추출하자.
     
     for i in range(len(cut_pix_list)-1):
         cut_line = cut_pix_list[i+1] - cut_pix_list[i]
@@ -279,8 +302,10 @@ def make_ocr_sequence_json(image_path, cut_pix_list):
             exist_eng = eng_ptrn.search(line[1][0])
             exist_hanja = hanja_ptrn.search(line[1][0])
             exist_kor_vowel_consonant = kor_vowel_consonant_ptrn.search(line[1][0])
-            # bbox = line[0]
+            bbox = line[0]
             # height = max(bbox[3][1] - bbox[1][1], bbox[2][1] - bbox[0][1]) # 최대 높이 기준. 이게 클수록 OCR이 잘되기에 까다로워지도록 설정.
+            # tortion = max(bbox[3][1] - bbox[2][1], bbox[1][1] - bbox[0][1])
+            
             # height_threshold = height / 20
 
             # kor_eng_height_threshold = height_threshold if height_threshold * 0.91 < 0.92 else 0.91
@@ -301,15 +326,37 @@ def make_ocr_sequence_json(image_path, cut_pix_list):
 
             for ax in line[0]:
                 ax[1]+=cut_line
-
+            
+            trimmed_text =  replace_text(line[1][0])
         # 문자와 바운딩박스 좌표를 dict으로 묶어서 리스트에 추가
-            ocr_sequence.append({'text': replace_text(line[1][0]), "bbox":line[0]})
+            ocr_sequence.append({'text': trimmed_text, "bbox":line[0]})
+            ocr_sequence_text += " "+trimmed_text
+            # if height < 30:
+            #     height_sequence.append({'text': trimmed_text, "bbox":line[0], "size": height})
+            #     height_sequence_text += " "+trimmed_text
+            # if tortion/height > 0.15:
+            #     tortion_sequence.append({'text': trimmed_text, "bbox":line[0], "tortion": tortion})
+            #     tortion_sequence_text += " "+trimmed_text
+            
 
-        image_filename = image_path[image_path.rfind("\\")+1:].replace('.jpg', '').replace('.png', '')
-        with open(f'./ocr_jsons/{image_filename}_{i}.json','w', encoding='utf-8-sig') as json_file:
-            json.dump(ocr_sequence, json_file, ensure_ascii=False)
-        
-        ocr_sequence.clear()    
+    image_filename = image_path[image_path.rfind("\\")+1:].replace('.jpg', '').replace('.png', '')
+    
+    
+    ocr_sequence.insert(0,ocr_sequence_text.lstrip())
+    # height_sequence.insert(0,height_sequence_text)
+    # tortion_sequence.insert(0,tortion_sequence_text)
+
+    if not os.path.exists("./ocr_jsons_test"):
+        os.mkdir("./ocr_jsons_test")
+    with open(f'./ocr_jsons_test/{image_filename}_{i}.json','w', encoding='utf-8-sig') as json_file:
+        json.dump(ocr_sequence, json_file, ensure_ascii=False)
+    # with open(f'./ocr_jsons_test/{image_filename}_{i}_h_under30.json','w', encoding='utf-8-sig') as json_file:
+    #     json.dump(height_sequence, json_file, ensure_ascii=False)
+    # with open(f'./ocr_jsons_test/{image_filename}_{i}_tortion02.json','w', encoding='utf-8-sig') as json_file:
+    #     json.dump(tortion_sequence, json_file, ensure_ascii=False)
+    
+    
+    
 
     log.info(f"[SUCCESS] OCR completed.")
 

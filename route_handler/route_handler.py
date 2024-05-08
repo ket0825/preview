@@ -87,7 +87,7 @@ class RouteHandler:
         res_text, res_code = delete_request(url=f'{self._url}/ip/{address}', timeout=1)
         return res_text, res_code
     
-    def get_product(self, prid=None, name=None, s_category=None, caid=None):
+    def get_product(self, prid=None, match_nv_mid=None, s_category=None, caid=None):
         """
         prid: path parameter
         name: query string
@@ -98,8 +98,8 @@ class RouteHandler:
         suffix_url = ''
         if prid and isinstance(prid, str):
             suffix_url += f'/{prid}'
-        if name and isinstance(name, str):
-            suffix_url += f'?name={name}&'
+        if match_nv_mid and isinstance(match_nv_mid, str):
+            suffix_url += f'?match_nv_mid={match_nv_mid}&'
 
         if caid and isinstance(caid, str):
             suffix_url += f'?caid={caid}&'

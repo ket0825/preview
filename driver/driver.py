@@ -63,6 +63,9 @@ class Driver:
         self.active_user_agent=  active_user_agent
         self.use_proxy = use_proxy
         self.get_log = get_log
+
+        # save current url
+        self.current_url = ""
     
     def set_options(self, headless=False, active_user_agent=False, use_proxy=False, get_log=True) -> Options:
         options = Options()
@@ -129,7 +132,10 @@ class Driver:
             self.driver.get(f"https://search.shopping.naver.com/search/category/100005309?adQuery&catId=50000153&origQuery&pagingIndex=1&pagingSize=40&productSet=model&query&sort=rel&timestamp=&viewType=list")
 
     def get_current_url(self):
-        return self.driver.current_url
+        self.driver.get(self.current_url)
+    
+    def set_current_url(self):
+        self.current_url = self.driver.current_url
     
     def go_next_page(self):
         if self.driver.current_url:
@@ -139,6 +145,12 @@ class Driver:
             self.page +=1
         else:
             log.error("[ERROR] no current URL.")
+
+    def flush_log(self):
+        if self.get_log:
+            self.driver.get_log('performance')
+        
+        
 
 
     def wait(self, time:float) -> None:
@@ -195,7 +207,8 @@ class Driver:
             # Restart driver.
             options = self.set_options(headless=self.headless, active_user_agent=self.active_user_agent, use_proxy=self.use_proxy, get_log=self.get_log)
             self.driver = webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()),
-                                           options=options)        
+                                           options=options)
+
 
                     
 
