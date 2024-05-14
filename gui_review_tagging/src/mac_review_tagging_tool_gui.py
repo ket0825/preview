@@ -295,7 +295,7 @@ def save_to_our_topics():
                 our_topics[current_index][topic_idx]['text'] = widget.get('1.0', tk.END).rstrip() 
                 target_str = our_topics[current_index][topic_idx]['text'].strip()
                 our_topics[current_index][topic_idx]['start_pos'] = data[current_index]['content'].find(target_str)
-                our_topics[current_index][topic_idx]['end_pos'] = data[current_index]['content'].find(target_str) + len(target_str)+1 if data[current_index]['content'].find(target_str) > -1 else -1
+                our_topics[current_index][topic_idx]['end_pos'] = data[current_index]['content'].find(target_str) + len(target_str) if data[current_index]['content'].find(target_str) > -1 else -1
             elif widget_order == 1:
                 our_topics[current_index][topic_idx]['topic'] = widget.get()
             elif widget_order == 2:
