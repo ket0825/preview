@@ -2,6 +2,8 @@
 import json
 import datetime
 import os
+import re
+from argparse import ArgumentParser
 # 3rd party lib.
 from driver.driver import Driver
 from selenium.webdriver.common.by import By
@@ -11,10 +13,19 @@ from selenium.webdriver.remote.webelement import WebElement
 # custom lib.
 from log import Logger 
 log = Logger.get_instance()
+from route_handler.route_handler import RouteHandler
 
 
-# 이후 환경 변수로 수정.
-PAGE_NUM = 5
+match_nv_mid_ptrn = re.compile(r'nvMid=(\d+)')
+
+
+
+def url_naver_formatter(url):
+    nvmid = match_nv_mid_ptrn.search(url).group(1)
+    if nvmid:
+        return nvmid, f'https://search.shopping.naver.com/catalog/{nvmid}'
+    else:
+        print(f"[ERROR] No nvmid found in the url. {url}")
 
 
 def price_formatter(price_element: WebElement) -> str:
@@ -33,11 +44,13 @@ def grade_formatter(grade_element: WebElement) -> str:
 def review_count_formatter(review_count: WebElement) -> str:
     return int(review_count.text.replace(",", "").replace("\n", "").replace('(', '').replace(')', ''))
 
-def product_link_crawler(category:str):
-    # category = 'smartwatch'
-    category = 'keyboard'
-    naver_shopping_driver = Driver(headless=True, active_user_agent=True, get_log=False)
-
+def product_link_crawler(category:str, type:str, page_num:int, 
+                         headless=False, 
+                         active_user_agent=False, 
+                         use_proxy=False) -> None:
+    # category = 'keyboard'
+    naver_shopping_driver = Driver(headless=headless, active_user_agent=active_user_agent, use_proxy=use_proxy, get_log=False)
+    
     # 태그 매치
     """https://saucelabs.com/resources/blog/selenium-tips-css-selectors"""
     # XPATH 예시들.
@@ -52,13 +65,17 @@ def product_link_crawler(category:str):
     naver_shopping_driver.wait(5)
     
     product_dict = {
-                        "category": category,
-                        'url': naver_shopping_driver.driver.current_url,
-                        }
-    
-    product_dict['start_page'] = naver_shopping_driver.page
+                    "category": category,
+                    'url': naver_shopping_driver.driver.current_url,
+                    'start_page': naver_shopping_driver.page,
+                    'end_page': "",
+                    'items': [],
+                    'type': type,
+                    }       
+
+    # Crawling start.    
     items = []
-    for p in range(PAGE_NUM): # 1페이지부터 5페이지까지임.
+    for p in range(page_num): # 1페이지부터 page_num까지임.
         try:
             footer = naver_shopping_driver.wait_until_by_xpath(3, ".//div[contains(@class, 'footer_info')]")
             naver_shopping_driver.move_to_element(element=footer)
@@ -74,11 +91,12 @@ def product_link_crawler(category:str):
                                 'review_count': "",
                                 'brand': "", # 차후 넣을 예정.
                                 'maker': "", # 차후 넣을 예정.
+                                "match_nv_mid": "",
                                }
                 # 링크와 제품명 추출.
                 try:
                     a_tag = item.find_element(By.XPATH, ".//div[contains(@class, 'product_title_')]/a")
-                    item_dict['url'] = a_tag.get_attribute('href')
+                    item_dict['match_nv_mid'], item_dict['url'] = url_naver_formatter(a_tag.get_attribute('href'))
                     item_dict['name'] = a_tag.get_attribute('title') # "/ 들어간 거 replace 하게 될수도"
                     items.append(item_dict)
                 except Exception as e:
@@ -103,36 +121,61 @@ def product_link_crawler(category:str):
                     item_dict['review_count'] = review_count_formatter(grade_num)
                 except Exception as e:
                     log.warning(f'[WARNING] Could not catch grade_num at {item_dict["name"]}')
-
                 
-            if p < PAGE_NUM - 1:
+            if p < page_num - 1:
                 naver_shopping_driver.go_next_page()
                 
         except TimeoutException as e:
+            # Without page of footers => it might be ip-banned.
             log.info(f"[ERROR] Time out error occured: Couldn't found footer or last page.\n\
                      Error log: {e}")
+            if naver_shopping_driver.driver.find_element(By.XPATH, ".//div[contains(@class, 'content_error')]"):
+                log.warning("[WARNING] IP Blocked.")
+                naver_shopping_driver.set_ip_dirty()
+            
         except Exception as e:
             log.info(f"[ERROR] Error log: {e}")
-
-    product_dict['end_page'] = naver_shopping_driver.page
-    product_dict['items'] = items
-    product_dict['type'] = "P0"
+            if naver_shopping_driver.driver.find_element(By.XPATH, ".//div[contains(@class, 'content_error')]"):
+                log.warning("[WARNING] IP Blocked.")
+                naver_shopping_driver.set_ip_dirty()            
 
     current_time = datetime.datetime.now().strftime('%Y%m%d_%Hh%Mm')
-    
-    if not os.path.exists("./api_call"):
-        os.mkdir("./api_call")
-    
-    with open(f'./api_call/{current_time}_{category}_product_link.json', 'w', encoding='utf-8-sig') as json_file:
-        json.dump(product_dict, json_file, ensure_ascii=False)
-        log.info(f"[SUCCESS] Success at {category}")
+    product_dict['items'] = items
+    product_dict['end_page'] = naver_shopping_driver.page
 
+    route_handler = RouteHandler()
+    route_handler.upsert_product_match(product_dict)
+    log.info(f"[SUCCESS] Success at {category}")
+
+    # if not os.path.exists("./api_call"):
+    #     os.mkdir("./api_call")
+
+    # with open(f'./api_call/{current_time}_{category}_product_link.json', 'w', encoding='utf-8-sig') as json_file:
+    #     json.dump(product_dict, json_file, ensure_ascii=False)
+    #     log.info(f"[SUCCESS] Success at {category}")
     
     naver_shopping_driver.release()
+    
 
+if __name__ == '__main__':    
+    parser = ArgumentParser(description='Product link crawler for naver shopping. Enter the category.')
+    parser.add_argument('category', type=str, help='Enter the category you want to crawl.', default="keyboard")
+    parser.add_argument('--headless', type=bool, help='Set headless mode.', default=False)
+    parser.add_argument('--use_proxy', type=bool, help='Set use proxy ip.', default=False)
+    parser.add_argument('--active_user_agent', type=bool, help='Active user agent.', default=False)
+    parser.add_argument('--type', type=str, help='Enter the type.', default="P0")
+    parser.add_argument('--page_num', type=int, help='Enter page_num.', default=5)
+    args = parser.parse_args() 
 
-if __name__ == '__main__':
-    product_link_crawler(category='keyboard')
+    log.info(f"[INFO] Start crawling at {args.category}")
+    log.info(f"[INFO] Headless: {args.headless}, Use proxy: {args.use_proxy}, Active user agent: {args.active_user_agent}")
+
+    product_link_crawler(category=args.category, headless=args.headless, 
+                         active_user_agent=args.active_user_agent, 
+                         use_proxy=args.use_proxy,
+                         type=args.type, page_num=args.page_num)
+    log.info(f"[SUCCESS] Success at {args.category}")
+    
 
 
 
