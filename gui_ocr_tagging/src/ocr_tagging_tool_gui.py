@@ -3,6 +3,8 @@ import tkinter as tk
 from tkinter import ttk, scrolledtext, filedialog
 import json
 
+# TODO: Add topic type.
+
 current_index = 0
 topic_entries = []
 topic_frames = []
@@ -300,7 +302,7 @@ def save_to_ocr_topics():
                 ocr_topics[current_index][topic_idx]['text'] = widget.get('1.0', tk.END).rstrip() 
                 target_str = ocr_topics[current_index][topic_idx]['text']
                 ocr_topics[current_index][topic_idx]['start_pos'] = data[current_index][0].find(target_str)
-                ocr_topics[current_index][topic_idx]['end_pos'] = data[current_index][0].find(target_str) + len(target_str)+1 if data[current_index][0].find(target_str) > -1 else -1
+                ocr_topics[current_index][topic_idx]['end_pos'] = data[current_index][0].find(target_str) + len(target_str) if data[current_index][0].find(target_str) > -1 else -1
             elif widget_order == 1:
                 ocr_topics[current_index][topic_idx]['topic'] = widget.get()
 
