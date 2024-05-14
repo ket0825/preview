@@ -4,6 +4,7 @@
 """https://selenium-python.readthedocs.io/locating-elements.html"""
 
 # TODO: ip banned case.
+# TODO: crawled at the last review...
 
 #stdlib
 import json

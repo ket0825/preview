@@ -214,7 +214,7 @@ class RouteHandler:
             ...
         ]
         """
-        res_text, res_code = post_request(f'{self._url}/review', data, timeout=5)
+        res_text, res_code = post_request(f'{self._url}/review', data, timeout=1000)
         return res_text, res_code
     
     def get_topic_by_reid(

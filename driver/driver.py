@@ -72,9 +72,11 @@ class Driver:
         if headless:
             options.add_argument("--headless=new")
 
-        ip_row = self._route_handler.get_ip(unused=True)
-        unused_ip = ip_row[0]
-        self._ip_obj = unused_ip        
+        if active_user_agent or use_proxy:        
+            ip_row = self._route_handler.get_ip(unused=True)        
+            
+            unused_ip = ip_row[0]
+            self._ip_obj = unused_ip        
                           
         if active_user_agent:                           
             log.info(f"user_agent: {self._ip_obj['user_agent']}")
@@ -208,12 +210,10 @@ class Driver:
             options = self.set_options(headless=self.headless, active_user_agent=self.active_user_agent, use_proxy=self.use_proxy, get_log=self.get_log)
             self.driver = webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()),
                                            options=options)
-
-
-                    
-
-
-            
+        else:
+            log.error("[ERROR] IP is not unused. Can't set dirty.")
+            log.info("DRIVER CLOSING...")
+            self.release()
 
 
 if __name__ == '__main__':
