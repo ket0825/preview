@@ -150,6 +150,7 @@ def get_image_specs(driver:Driver, xpath):
         image_urls.append(img_url_dict)
         seller_spec.append(ocr_function(src))
     
+    log.info(f"[INFO] seller_spec: {seller_spec}")
     return seller_spec, image_urls
 
 # TODO: later, it should be an multiprocessing.
@@ -194,12 +195,12 @@ def fetch_product_spec(driver:Driver):
                 
     # brand content banner 존재 시.
     # TODO: # 사진 가져오고, 이후 병렬처리 (multiprocessing)    
-    try:
-        seller_spec_payload, img_urls_payload = get_image_specs(driver, ".//div[contains(@class, 'brandContent_export_')]/img")
-        seller_spec.extend(seller_spec_payload)
-        img_urls.extend(img_urls_payload)        
-    except NoSuchElementException:
-        pass
+    # try:
+    #     seller_spec_payload, img_urls_payload = get_image_specs(driver, ".//div[contains(@class, 'brandContent_export_')]/img")
+    #     seller_spec.extend(seller_spec_payload)
+    #     img_urls.extend(img_urls_payload)        
+    # except NoSuchElementException:
+    #     pass
     try:
         seller_spec_payload, img_urls_payload = get_image_specs(driver, ".//p[contains(@id, 'detailFromBrand')]/img")
         seller_spec.extend(seller_spec_payload)
@@ -502,7 +503,7 @@ if __name__ == '__main__':
     parser.add_argument('--active_user_agent', type=bool, help='Active user agent.', default=False)
     parser.add_argument('--type', type=str, help='Enter the type.', default="R0")
 
-    args = parser.parse_args() 
+    args = parser.parse_args()
 
     log.info(f"[INFO] Start crawling at {args.category}")
     log.info(f"[INFO] Headless: {args.headless}, Use proxy: {args.use_proxy}, Active user agent: {args.active_user_agent}")
