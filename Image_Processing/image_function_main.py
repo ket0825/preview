@@ -195,10 +195,11 @@ def make_ocr_sequence(image_path, cut_pix_list, width_threshold=150, height_thre
         image = Image.open(image_path)
 
     width = image.size[0]   # 이미지 가로
-
+    
     prev_bbox = None
+    cut_line = 0
     for i in range(len(cut_pix_list)-1):
-        cut_line = cut_pix_list[i+1] - cut_pix_list[i]
+        # log.info(f"cut_line: {cut_line}")
         box = (0, cut_pix_list[i], width, cut_pix_list[i+1])
         cropped_image_arr = np.asarray(image.crop(box), dtype='uint8')
         result = ocr_engine.ocr(cropped_image_arr, cls=True)
@@ -235,6 +236,7 @@ def make_ocr_sequence(image_path, cut_pix_list, width_threshold=150, height_thre
 
             for ax in line[0]:
                 ax[1]+=cut_line
+                # log.info(f"ax: {ax}")
             
             bbox = line[0]
             # Not the first line
@@ -254,18 +256,20 @@ def make_ocr_sequence(image_path, cut_pix_list, width_threshold=150, height_thre
         image_data.insert(0, " ".join(json_text_list))
         ocr_sequence.append(image_data)    
 
+        cut_line += cut_pix_list[i+1] - cut_pix_list[i]
+
     log.info(f"[SUCCESS] OCR completed.")
 
     return ocr_sequence
 
 
-def make_ocr_sequence_json(image_path, cut_pix_list):
+def make_ocr_sequence_json(output_path, image_path, cut_pix_list):
     """
     image_path: img tag src attribute. e.g link of img.
 
     cut_pix_list: sorted cutline list.
     """
-
+    
     if not os.path.exists('./ocr_jsons'):
         os.mkdir('./ocr_jsons')
 
@@ -286,9 +290,8 @@ def make_ocr_sequence_json(image_path, cut_pix_list):
     tortion_sequence_text = ""
     # .만 임의로 넣어주고.
     # tagging을 한 이후로 다시 돌려서 중요한 정보들만 추출하자.
-    
+    cut_line = 0
     for i in range(len(cut_pix_list)-1):
-        cut_line = cut_pix_list[i+1] - cut_pix_list[i]
         box = (0, cut_pix_list[i], width, cut_pix_list[i+1])
         cropped_image_arr = np.asarray(image.crop(box), dtype='uint8')
         result = ocr_engine.ocr(cropped_image_arr, cls=True)
@@ -337,26 +340,36 @@ def make_ocr_sequence_json(image_path, cut_pix_list):
             # if tortion/height > 0.15:
             #     tortion_sequence.append({'text': trimmed_text, "bbox":line[0], "tortion": tortion})
             #     tortion_sequence_text += " "+trimmed_text
+        
+        # cut_line에는 이전 라인의 높이를 더해줌.
+        cut_line += cut_pix_list[i+1] - cut_pix_list[i]
             
 
     image_filename = image_path[image_path.rfind("\\")+1:].replace('.jpg', '').replace('.png', '')
     
     
-    ocr_sequence.insert(0,ocr_sequence_text.lstrip())
+    # ocr_sequence.insert(0,ocr_sequence_text.lstrip())
     # height_sequence.insert(0,height_sequence_text)
     # tortion_sequence.insert(0,tortion_sequence_text)
 
-    if not os.path.exists("./ocr_jsons_test"):
-        os.mkdir("./ocr_jsons_test")
-    with open(f'./ocr_jsons_test/{image_filename}_{i}.json','w', encoding='utf-8-sig') as json_file:
+    if not os.path.exists(f"./{output_path}"):
+        os.mkdir(f"./{output_path}")
+    
+    count = 1
+    final_fp = ""
+    while True:
+        if os.path.exists(f"./{output_path}/{image_filename}_{count}.json"):
+            count+=1
+        else:
+            final_fp = f"./{output_path}/{image_filename}_{count}.json"
+            break
+
+    with open(final_fp,'w', encoding='utf-8-sig') as json_file:
         json.dump(ocr_sequence, json_file, ensure_ascii=False)
     # with open(f'./ocr_jsons_test/{image_filename}_{i}_h_under30.json','w', encoding='utf-8-sig') as json_file:
     #     json.dump(height_sequence, json_file, ensure_ascii=False)
     # with open(f'./ocr_jsons_test/{image_filename}_{i}_tortion02.json','w', encoding='utf-8-sig') as json_file:
-    #     json.dump(tortion_sequence, json_file, ensure_ascii=False)
-    
-    
-    
+    #     json.dump(tortion_sequence, json_file, ensure_ascii=False)    
 
     log.info(f"[SUCCESS] OCR completed.")
 

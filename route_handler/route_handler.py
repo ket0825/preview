@@ -113,6 +113,8 @@ class RouteHandler:
     
     def upsert_product_match(self, data:Dict): # First result at crawling.
         res_text, res_code = post_request(f'{self._url}/product/match', data, timeout=5)
+        if res_code == 400:
+            log.info(f'[ERROR] {res_text}, data: {data}')
         return res_text, res_code
 
     def update_product_detail_one(self, data:Dict):
@@ -125,7 +127,10 @@ class RouteHandler:
             ...
         }
         """
-        res_text, res_code = post_request(f'{self._url}/product/detail/one', data=data, timeout=5)
+        res_text, res_code = post_request(f'{self._url}/product/detail/one', data=data, timeout=10)
+        if res_code == 400:
+            log.info(f'[ERROR] {res_text}, data: {data}')
+
         return res_text, res_code
 
     def get_product_history(self, caid=None, prid=None, count_desc=None):
@@ -215,12 +220,15 @@ class RouteHandler:
         ]
         """
         res_text, res_code = post_request(f'{self._url}/review', data, timeout=1000)
+        if res_code == 400:
+            log.info(f'[ERROR] {res_text}, data: {data}')
+            
         return res_text, res_code
     
-    def get_topic_by_reid(
-            self, reid, 
-            caid=None, prid=None, topic_code=None, 
-            topic_score=None, type=None, 
+    def get_topic_by_type(
+            self, type, caid=None, reid=None, 
+            prid=None, topic_code=None, 
+            topic_score=None,  
             positive_yn=None, sentiment_scale=None                                                                  
         ):
         """
@@ -231,24 +239,45 @@ class RouteHandler:
         sentiment_scale: query string
         """
         url = f'{self._url}/topic'
-        suffix_url = ''
-        suffix_url += f'/{reid}'
+        suffix_url = '?'
+
+        if reid and isinstance(reid, str):
+            suffix_url += f'reid={reid}&'
         if caid and isinstance(caid, str):
-            suffix_url += f'?caid={caid}&'
+            suffix_url += f'caid={caid}&'
         if prid and isinstance(prid, str):
-            suffix_url += f'?prid={prid}&'
+            suffix_url += f'prid={prid}&'
         if topic_code and isinstance(topic_code, str):
-            suffix_url += f'?topic_code={topic_code}&'
+            suffix_url += f'topic_code={topic_code}&'
         if topic_score and isinstance(topic_score, str):
-            suffix_url += f'?topic_score={topic_score}&'    
+            suffix_url += f'topic_score={topic_score}&'    
         if type and isinstance(type, str):
-            suffix_url += f'?type={type}&'
+            suffix_url += f'type={type}&'
         if positive_yn and isinstance(positive_yn, str):
-            suffix_url += f'?positive_yn={positive_yn}&'
+            suffix_url += f'positive_yn={positive_yn}&'
         if sentiment_scale and isinstance(sentiment_scale, str):
-            suffix_url += f'?sentiment_scale={sentiment_scale}&'
-        suffix_url = suffix_url.rstrip('&')            
+            suffix_url += f'sentiment_scale={sentiment_scale}&'
+        suffix_url = suffix_url.rstrip('&')
+        
+        print(f'{url}{suffix_url}')
         res = get_request(url=f'{url}{suffix_url}', data=None, timeout=5)
+        
+        return res
+    
+        
+    def get_kano_model_data(self, type, caid):
+        """
+        type: query string
+        caid: query string
+        """
+        url = f'{self._url}/topic/kano_model'
+        suffix_url = '?'
+        if type and isinstance(type, str):
+            suffix_url += f'type={type}&'
+        if caid and isinstance(caid, str):
+            suffix_url += f'caid={caid}&'
+        suffix_url = suffix_url.rstrip('&')            
+        res = get_request(url=f'{url}{suffix_url}', data=None, timeout=10)
         
         return res
         
@@ -256,7 +285,7 @@ class RouteHandler:
 
 if __name__ == "__main__":
     route_handler = RouteHandler()
-    print(route_handler.get_topic_by_reid(reid="R01", caid="C02", prid="P01"))
+    print(route_handler.get_topic_by_type(type="RT0", caid="C02"))
 
 
     
