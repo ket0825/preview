@@ -49,15 +49,17 @@ https://www.geeksforgeeks.org/find_element_by_xpath-driver-method-selenium-pytho
 # 느긋하게 하려면 options.set_capability("pageLoadStrategy"... 이 부분 주석처리.
 class Driver:
     
-    def __init__(self, headless=True, active_user_agent=False, use_proxy=False, get_log=True) -> None:
+    def __init__(self, headless=True, active_user_agent=False, use_proxy=False, get_log=True) -> None:        
         # TODO: start from log requests.
         # make chrome log requests
         # capabilities["loggingPrefs"] = {"performance": "ALL"}  # newer: goog:loggingPrefs
         self._ip_obj = {}
-        self._route_handler = RouteHandler()        
+        self._route_handler = RouteHandler()                             
         options = self.set_options(headless, active_user_agent, use_proxy, get_log)
-        self.driver = webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()),
-                                       options=options)
+        self.driver = webdriver.Chrome(
+            service=ChromeService(ChromeDriverManager(driver_version="126.0.6478.115").install()),
+                                       options=options,
+                                       )
         # save options
         self.headless = headless
         self.active_user_agent=  active_user_agent
@@ -124,14 +126,13 @@ class Driver:
 
     def get_url_by_category(self, category:str) -> None:
         self.page = 1
-        if category == 'smartwatch':
-            self.driver.get(f"https://search.shopping.naver.com/search/category/100005046?adQuery&catId=50000262&origQuery&pagingIndex=1&pagingSize=40&productSet=model&query&sort=rel&spec=M10016843%7CM10664435&timestamp=&viewType=list")
-        elif category == 'extra_battery':
-            self.driver.get(f"https://search.shopping.naver.com/search/category/100005088?adQuery&catId=50001380&origQuery&pagingIndex=1&pagingSize=40&productSet=model&query&sort=rel&timestamp=&viewType=list")
-        elif category == 'keyboard':
-            self.driver.get(f"https://search.shopping.naver.com/search/category/100005369?adQuery&catId=50001204&origQuery&pagingIndex=1&pagingSize=40&productSet=model&query&sort=rel&timestamp=&viewType=list")
-        elif category == 'monitor':
-            self.driver.get(f"https://search.shopping.naver.com/search/category/100005309?adQuery&catId=50000153&origQuery&pagingIndex=1&pagingSize=40&productSet=model&query&sort=rel&timestamp=&viewType=list")
+        
+        category = self._route_handler.get_category(s_category=category)
+        category = category[0]
+        if category:
+            self.get(category['url'])
+            log.info(f"[SUCCESS] GET URL BY CATEGORY: {category['url']}")
+            self.current_url = category['url']
 
     def get_current_url(self):
         self.driver.get(self.current_url)
