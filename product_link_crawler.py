@@ -42,7 +42,10 @@ def grade_formatter(grade_element: WebElement) -> str:
     return round(float(grade_str),2)
 
 def review_count_formatter(review_count: WebElement) -> str:
-    return int(review_count.text.replace(",", "").replace("\n", "").replace('(', '').replace(')', ''))
+    if '만' in review_count.text:
+        return int(float(review_count.text.replace(",", "").replace("\n", "").replace('(', '').replace(')', '').replace('만', '')) * 10000)
+    else:
+        return int(review_count.text.replace(",", "").replace("\n", "").replace('(', '').replace(')', ''))
 
 def product_link_crawler(category:str, type:str, page_num:int, 
                          headless=False, 
@@ -60,7 +63,7 @@ def product_link_crawler(category:str, type:str, page_num:int,
     # username = driver.find_element(By.XPATH, "//form[input/@name='username']")
     # CSS_SELECTOR substring match.
     # link = naver_shopping_driver.driver.find_elements(By.CSS_SELECTOR, "div[class*='reviewItems_title']") # substring match.
-    
+    print(category)
     naver_shopping_driver.get_url_by_category(category)
     naver_shopping_driver.wait(5)
     
@@ -144,8 +147,12 @@ def product_link_crawler(category:str, type:str, page_num:int,
     product_dict['end_page'] = naver_shopping_driver.page
 
     route_handler = RouteHandler()
-    route_handler.upsert_product_match(product_dict)
-    log.info(f"[SUCCESS] Success at {category}")
+    res_text, res_code = route_handler.upsert_product_match(product_dict)
+    if res_code != 200:
+        log.error(f"[ERROR] Could not post request at product_match. {res_text} Error code: {res_code}")
+    else:
+        log.info(f"[SUCCESS] Success at {category}")
+
 
     # if not os.path.exists("./api_call"):
     #     os.mkdir("./api_call")
@@ -157,24 +164,31 @@ def product_link_crawler(category:str, type:str, page_num:int,
     naver_shopping_driver.release()
     
 
-if __name__ == '__main__':    
-    parser = ArgumentParser(description='Product link crawler for naver shopping. Enter the category.')
-    parser.add_argument('category', type=str, help='Enter the category you want to crawl.', default="keyboard")
-    parser.add_argument('--headless', type=bool, help='Set headless mode.', default=False)
-    parser.add_argument('--use_proxy', type=bool, help='Set use proxy ip.', default=False)
-    parser.add_argument('--active_user_agent', type=bool, help='Active user agent.', default=False)
-    parser.add_argument('--type', type=str, help='Enter the type.', default="P0")
-    parser.add_argument('--page_num', type=int, help='Enter page_num.', default=5)
-    args = parser.parse_args() 
+if __name__ == '__main__':            
+    for category in [
+        # "tv",
+                    #  "tablet",
+                     "nutritional_supplements",
+                     ]:
+        parser = ArgumentParser(description='Product link crawler for naver shopping. Enter the category.')
+        parser.add_argument('--category', type=str, help='Enter the category you want to crawl.', default=category)
+        parser.add_argument('--headless', type=bool, help='Set headless mode.', default=False)
+        parser.add_argument('--use_proxy', type=bool, help='Set use proxy ip.', default=False)
+        parser.add_argument('--active_user_agent', type=bool, help='Active user agent.', default=False)
+        parser.add_argument('--type', type=str, help='Enter the type.', default="P0")
+        parser.add_argument('--page_num', type=int, help='Enter page_num.', default=5)
+        args = parser.parse_args() 
 
-    log.info(f"[INFO] Start crawling at {args.category}")
-    log.info(f"[INFO] Headless: {args.headless}, Use proxy: {args.use_proxy}, Active user agent: {args.active_user_agent}")
+        log.info(f"[INFO] Start crawling at {args.category}")    
+        log.info(f"[INFO] Headless: {args.headless}, Use proxy: {args.use_proxy}, Active user agent: {args.active_user_agent}")
 
-    product_link_crawler(category=args.category, headless=args.headless, 
-                         active_user_agent=args.active_user_agent, 
-                         use_proxy=args.use_proxy,
-                         type=args.type, page_num=args.page_num)
-    log.info(f"[SUCCESS] Success at {args.category}")
+        product_link_crawler(category=args.category, headless=args.headless, 
+        # product_link_crawler(category=category, headless=args.headless, 
+                            active_user_agent=args.active_user_agent, 
+                            use_proxy=args.use_proxy,
+                            type=args.type, page_num=args.page_num)
+        # log.info(f"[SUCCESS] Success at {args.category}")
+    
     
 
 
