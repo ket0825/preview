@@ -110,33 +110,33 @@ def request_reviews(local=True):
     
     # OK.
 
-    # review_dir = r"./reviews_keyboard"
-    # for review_file in os.listdir(review_dir):
-    #     review_path = os.path.join(review_dir, review_file)
+    review_dir = r"./reviews_keyboard"
+    for review_file in os.listdir(review_dir):
+        review_path = os.path.join(review_dir, review_file)
 
-    #     if not review_path.endswith(".json"):
-    #         continue        
+        if not review_path.endswith(".json"):
+            continue        
 
-    #     with open(review_path, 'r', encoding="utf-8-sig") as f:
-    #         data = json.load(f)
+        with open(review_path, 'r', encoding="utf-8-sig") as f:
+            data = json.load(f)
 
         
 
-    #     match_nv_mid = data[0].get('matchNvMid')
-    #     packets = {
-    #         "match_nv_mid": match_nv_mid,
-    #         "type": "R0",
-    #         "reviews":data,
-    #     }        
+        match_nv_mid = data[0].get('matchNvMid')
+        packets = {
+            "match_nv_mid": match_nv_mid,
+            "type": "R0",
+            "reviews":data,
+        }        
 
-    #     res_text, res_status_code = route_handler.upsert_review_batch(packets)
-    #     print(res_text, res_status_code)
-    #     if res_status_code == 400:
-    #         print(review_path)
+        res_text, res_status_code = route_handler.upsert_review_batch(packets)
+        print(res_text, res_status_code)
+        if res_status_code == 400:
+            print(review_path)
 
 if __name__ == '__main__':
     request_product_match(local=True)
-    request_product_detail(local=True)
+    # request_product_detail(local=True)
     request_reviews(local=True)
 
 

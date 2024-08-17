@@ -9,3 +9,9 @@ class OCREngine:
         if not cls._instance:
             cls._instance = PaddleOCR(lang="korean")
         return cls._instance
+    
+
+    # for multi worker.
+    # @staticmethod
+    # def get_instance():
+    #     return PaddleOCR(lang="korean")

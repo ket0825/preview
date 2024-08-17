@@ -15,6 +15,8 @@ HEIGHT_THRESHOLD = 100
 # 추가 로직: 높이를 기록하고, 문자열 길이 파악하고, 높이가 같은 것이 없다면 제외하는 로직 고려.
 def ocr_string(img_data, prev_bbox):
     json_text_list = []
+    print(prev_bbox)
+    print(img_data)
     for line in img_data:
         if prev_bbox is not None and json_text_list:
             over_width_threshold = line['bbox'][0][0] - prev_bbox[2][0]  > WIDTH_THRESHOLD
@@ -27,14 +29,15 @@ def ocr_string(img_data, prev_bbox):
                 # or large_char_height_diff
                 ):  
                 json_text_list[-1]+=("\n")
+        print(line)
         json_text_list.append(line['text'].lower())
         prev_bbox = line['bbox']
 
     return json_text_list, prev_bbox
 
 def ocr_concat():
-    dir_name = r"./ocr_jsons"
-    output_dir_name = r"./ocr_jsons_processed3"
+    dir_name = r"./ocr_jsons_pixel_modified"
+    output_dir_name = r"./ocr_jsons_processed_demo"
     if not os.path.exists(output_dir_name):
         os.mkdir(output_dir_name)
 

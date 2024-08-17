@@ -21,6 +21,8 @@ kor_vowel_consonant_ptrn = re.compile(r'[ㄱ-ㅎㅏ-ㅣ]]')
 eng_ptrn = re.compile(r'[a-zA-Z]')
 
 log = Logger.get_instance()
+
+# For singleton.
 ocr_engine = OCREngine.get_instance()
 
 def replace_text(text:str):
@@ -198,6 +200,8 @@ def make_ocr_sequence(image_path, cut_pix_list, width_threshold=150, height_thre
     
     prev_bbox = None
     cut_line = 0
+    image_data = []
+    json_text_list = []
     for i in range(len(cut_pix_list)-1):
         # log.info(f"cut_line: {cut_line}")
         box = (0, cut_pix_list[i], width, cut_pix_list[i+1])
@@ -205,9 +209,7 @@ def make_ocr_sequence(image_path, cut_pix_list, width_threshold=150, height_thre
         result = ocr_engine.ocr(cropped_image_arr, cls=True)
 
         if not result or not result[0]:
-            continue        
-        image_data = []
-        json_text_list = []
+            continue                
         for line in result[0]:
             # 글자 이상한 것 체크.            
             exist_kor_eng = eng_ptrn.search(line[1][0]) and kor_ptrn.search(line[1][0])
@@ -253,14 +255,15 @@ def make_ocr_sequence(image_path, cut_pix_list, width_threshold=150, height_thre
         # 문자와 바운딩박스 좌표를 dict으로 묶어서 리스트에 추가
             image_data.append({'text': replace_text(line[1][0]), "bbox":line[0]})
         
-        image_data.insert(0, " ".join(json_text_list))
-        ocr_sequence.append(image_data)    
-
         cut_line += cut_pix_list[i+1] - cut_pix_list[i]
+        
+    image_data.insert(0, " ".join(json_text_list))
+       
+
 
     log.info(f"[SUCCESS] OCR completed.")
 
-    return ocr_sequence
+    return image_data
 
 
 def make_ocr_sequence_json(output_path, image_path, cut_pix_list):
