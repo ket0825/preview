@@ -13,7 +13,10 @@ import random
 import datetime
 import re
 import os
+from shutil import rmtree
 from argparse import ArgumentParser
+from concurrent.futures import ThreadPoolExecutor
+from typing import Dict, Any
 
 # 3rd party lib.
 from driver.driver import Driver
@@ -34,6 +37,7 @@ route_handler = RouteHandler()
 double_space_ptrn = re.compile(r" {2,}")
 double_newline_ptrn = re.compile(r"\n{2,}")
 access_word_ptrn = re.compile(r"[^가-힣ㄱ-ㅎㅏ-ㅣ0-9a-zA-Z\s'\"@_#$\^&*\(\)\-=+<>\/\|}{~:…℃±·°※￦\[\]÷\\;,\s]")
+executor = ThreadPoolExecutor(max_workers=8)
 
 def get_links(path:str) -> list:
     with open(path, 'r', encoding='utf-8-sig') as json_file:
@@ -88,7 +92,7 @@ def fetch_product_detail(driver: Driver):
 
     return brand, maker, grade, name, lowest_price
 
-def is_banned(naver_shopping_driver:Driver):
+def is_banned(naver_shopping_driver:Driver) :
     # IP Blocked 시, floating tab이 안나옴. 이걸로 체크.
     try:
         floating_tabs = naver_shopping_driver.wait_until_by_xpath(10, ".//div[contains(@class, 'floatingTab_detail_tab')]")
@@ -103,7 +107,10 @@ def is_banned(naver_shopping_driver:Driver):
 
 
 def fetch_spec(driver:Driver):    
-    driver.driver.find_element(By.XPATH, ".//a[contains(@class, 'top_more_')]").click() # 더 보기 클릭.
+    top_more = driver.driver.find_element(By.XPATH, ".//a[contains(@class, 'top_more_')]")
+    driver.move_to_element(top_more)
+    top_more.click() # 더 보기 클릭.
+    
     spec_dict = {}
     time.sleep(2)
     tables = driver.driver.find_elements(By.XPATH, ".//div[contains(@class, 'attribute_product_attribute_')]/table")
@@ -149,14 +156,18 @@ def get_image_specs(driver:Driver, xpath):
         img_url_dict['img_rendered_size'] = [web_element.size['width'], web_element.size['height']]
         image_urls.append(img_url_dict)
         seller_spec.append(ocr_function(src))
-    
-    log.info(f"[INFO] seller_spec: {seller_spec}")
+
+    # log.info(f"[INFO] seller_spec: {seller_spec}")
     return seller_spec, image_urls
 
 # TODO: later, it should be an multiprocessing.
-def fetch_product_spec(driver:Driver):
-    spec_info_section = driver.driver.find_element(By.XPATH, ".//h3[contains(@class, 'specInfo_section_title__')]")
-    driver.move_to_element(element=spec_info_section)
+def get_product_spec(driver:Driver):
+    try:
+        spec_info_section = driver.driver.find_element(By.XPATH, ".//h3[contains(@class, 'specInfo_section_title__')]")    
+        driver.move_to_element(element=spec_info_section)
+    except:
+        log.info(f"[WARNING] There is no product details.")
+        return {}, [], []
 
     # html tag에 height가 있는데...?
     naver_spec =  {} 
@@ -193,16 +204,11 @@ def fetch_product_spec(driver:Driver):
         except:
             log.info(f"[WARNING] There is no product details.")
                 
-    # brand content banner 존재 시.
-    # TODO: # 사진 가져오고, 이후 병렬처리 (multiprocessing)    
-    # try:
-    #     seller_spec_payload, img_urls_payload = get_image_specs(driver, ".//div[contains(@class, 'brandContent_export_')]/img")
-    #     seller_spec.extend(seller_spec_payload)
-    #     img_urls.extend(img_urls_payload)        
-    # except NoSuchElementException:
-    #     pass
     try:
         seller_spec_payload, img_urls_payload = get_image_specs(driver, ".//p[contains(@id, 'detailFromBrand')]/img")
+        if not seller_spec_payload:
+            seller_spec_payload, img_urls_payload = get_image_specs(driver, ".//div[contains(@class, 'imageSpecInfo_product_img_')]//img")
+
         seller_spec.extend(seller_spec_payload)
         img_urls.extend(img_urls_payload)        
     except NoSuchElementException:        
@@ -213,20 +219,34 @@ def fetch_product_spec(driver:Driver):
 def review_formatter(reviews:list[dict]) -> None:
     # remain_key = ['id', 'content', 'aidaModifyTime', 'mallId', 'mallSeq', 'matchNvMid', 'qualityScore', 'starScore', 'topicCount', "topicYn", 'topics', 'userId', 'mallName']    
     keys_to_remove = ["aidaCreateTime", "esModifyTime", "modifyDate", "pageUrl", "registerDate", "imageCount", "imageYn", "images", "mallProductId", "mallReviewId", "rankScore", "title", "videoCount", "videoYn", "videos", "mallLogoUrl"]
-    for review in reviews:
+    
+    
+    
+    for review in reviews:        
         for key in keys_to_remove:
-            review.pop(key)
+            review.pop(key)                
+        # review['content'] = review['content'].replace('<br>', '\n')\
+        #                                     .replace('<br/>', '\n')\
+        #                                     .replace("\r\n", "\n")\
+        #                                     .replace("\r", "\n")                            
+        # review['content'] = BeautifulSoup(review['content'], 'lxml').text
+        # review['content'] = access_word_ptrn.sub("", review['content'])
+        # review['content'] = double_space_ptrn.sub(" ", review['content'])
+        # review['content'] = double_newline_ptrn.sub("\n", review['content'])
+        # review['content'] = review['content'].strip()
         
-        review['content'] = review['content'].replace('<br>', '\n')\
+        # same as above.
+        review['content'] = double_newline_ptrn.sub(
+            "\n", double_space_ptrn.sub(
+                " ", access_word_ptrn.sub(
+                    "", BeautifulSoup(
+                        review['content'].replace('<br>', '\n')\
                                             .replace('<br/>', '\n')\
                                             .replace("\r\n", "\n")\
-                                            .replace("\r", "\n")
+                                            .replace("\r", "\n"), 
+                                        'lxml').text)
+                ).strip())
         
-        review['content'] = BeautifulSoup(review['content'], 'lxml').text
-        review['content'] = access_word_ptrn.sub("", review['content'])
-        review['content'] = double_space_ptrn.sub(" ", review['content'])
-        review['content'] = double_newline_ptrn.sub("\n", review['content'])
-        review['content'] = review['content'].strip()
 
 def log_filter(log_):
     return (
@@ -235,15 +255,26 @@ def log_filter(log_):
         # and json
         and "json" in log_["params"]["response"]["mimeType"]
     )
+    
+global total_reviews
+total_reviews = []
 
-def upsert_review(naver_shopping_driver: Driver, prid:str, match_nv_mid:str, s_category:str, type:str="R0"):
+def upsert_review(
+    naver_shopping_driver: Driver, 
+    prid:str, 
+    match_nv_mid:str, 
+    s_category:str, 
+    type:str="R0", 
+    for_local_test=True
+    ) -> Dict[str, Any]:
     """
     Flush log buffer and upsert reviews.
     """
     # Get review log
     chrome_logs_raw = naver_shopping_driver.driver.get_log("performance")
     chrome_logs = [json.loads(lr["message"])["message"] for lr in chrome_logs_raw]
-    total_reviews = []    
+    global total_reviews
+    
     for log_ in filter(log_filter, chrome_logs):
         request_id = log_["params"]["requestId"]
         resp_url = log_["params"]["response"]["url"]
@@ -252,25 +283,59 @@ def upsert_review(naver_shopping_driver: Driver, prid:str, match_nv_mid:str, s_c
             log.info(f"Caught {resp_url}")        
             reviews = json.loads(naver_shopping_driver.driver.execute_cdp_cmd("Network.getResponseBody", {"requestId": request_id})['body'])['reviews']
             review_formatter(reviews)
+            
+            ids_to_time = {
+                review['id']: review['aidaModifyTime']
+                for review in reviews
+            }    
+            
+            accept_ids = route_handler.check_if_need_update(ids_to_time)
+            print(f"accept_ids: {accept_ids}")
+            reviews = [review for review in reviews if review['id'] in accept_ids]
+            
             total_reviews.extend(reviews)
 
+    
+    
     # Complete review formatting.
     # post request to db.
-    payload = {
-        'type': type,
-        'category': s_category,
-        'prid': prid,
-        'match_nv_mid': match_nv_mid,
-        'reviews': total_reviews
-    }                                                                             
-    res_text, res_code = route_handler.upsert_review_batch(payload)
-    log.info(f"[INFO] {res_text}, {res_code}")
     
+    if len(total_reviews) >= 5:
+                
+        payload = {
+            'type': type,
+            'category': s_category,
+            'prid': prid,
+            'match_nv_mid': match_nv_mid,
+            'reviews': total_reviews
+        }                
+        current_time = datetime.datetime.now().strftime("%Y%m%d_%Hh%Mm%Ss")
+        global start_date, json_save_fp
+        if for_local_test:
+            if not os.path.exists(f"./{json_save_fp}/{start_date}_{s_category}_review"):
+                os.makedirs(f"./{json_save_fp}/{start_date}_{s_category}_review")
+            with open(f"./{json_save_fp}/{start_date}_{s_category}_review/{current_time}_{prid}.json", 'w', encoding='utf-8-sig') as json_file:                                                         
+                json.dump(payload, json_file, ensure_ascii=False, indent=4)    
+            return {"text": "Crawled locally.", "code": 200}
+        else:
+            future = executor.submit(route_handler.upsert_review_batch, payload)
+            # res_text, res_code = route_handler.upsert_review_batch(payload)
+            # log.info(f"[INFO] {res_text}, {res_code}")
+            future.add_done_callback(lambda future: log.info(f"[INFO] {future.result()}"))
+            # return {"text": res_text, "code": res_code}
+            
+        total_reviews.clear()
+        
 
-def review_crawler(category:str, type:str,
-                    headless=False, 
-                    active_user_agent=False, 
-                    use_proxy=False) -> None:
+def review_crawler(
+        category:str, 
+        type:str,
+        headless=False, 
+        active_user_agent=False, 
+        use_proxy=False,
+        for_local_test=True
+    ) -> None:
+    
     
     naver_shopping_driver = Driver(headless=headless, active_user_agent=active_user_agent, use_proxy=use_proxy, get_log=True)        
     
@@ -279,12 +344,20 @@ def review_crawler(category:str, type:str,
 
     products = route_handler.get_product(caid=caid)
     
-    for product in products:
-        # 원래는 크롤링한 사이트 링크들.
-        # if flag or name == "데이비드테크 엔보우 N패드 네오":
-        #     flag = True
-        # else:
-        #     continue
+    # 이미 크롤링한 데이터가 있으면 삭제하는 로직.
+    # global start_date, json_save_fp    
+    # if for_local_test and (
+    #     os.path.exists(f"./{json_save_fp}/{start_date}_{category}_review") 
+    #     or os.path.exists(f"./{json_save_fp}/{start_date}_{category}_ocr")
+    #     ):
+    #     log.warning(f"[WARNING] {category}_review directory already exists. DELETE IT.")                   
+    #     if os.path.exists(f"./{json_save_fp}/{start_date}_{category}_review"):
+    #         rmtree(f"./{json_save_fp}/{start_date}_{category}_review")            
+    #     if os.path.exists(f"./{json_save_fp}/{start_date}_{category}_ocr"):
+    #         rmtree(f"./{json_save_fp}/{start_date}_{category}_review")               
+    flag = False
+    for product in products:        
+
         prod_dict = {
                 "grade": "",
                 "name": "",
@@ -315,11 +388,15 @@ def review_crawler(category:str, type:str,
         # 로지텍 K830: 리뷰 27000개
         # naver_shopping_driver.get("https://search.shopping.naver.com/catalog/8974763652?&NaPm=ct%3Dlucr5xuw%7Cci%3D5549087459ddae34d93daf8f0d9e0686cf56ea87%7Ctr%3Dslcc%7Csn%3D95694%7Chk%3D784343aaa845130bbe75468952f58e847fc0499c")
                 
-        while is_banned(naver_shopping_driver):
+        while use_proxy and is_banned(naver_shopping_driver) :
             pass
 
-        # get product detail         
-        brand, maker, grade, name, lowest_price = fetch_product_detail(naver_shopping_driver)
+        # get product detail    
+        try:
+            brand, maker, grade, name, lowest_price = fetch_product_detail(naver_shopping_driver)
+        except:
+            log.warning("[WARNING] No floating tabs. Skip this product.") # 연량확인 필요한 제품인 경우도 존재.
+            continue     
                 
         log.info(f"[INFO] Brand: {brand}, Maker: {maker}")
         prod_dict["brand"] = brand
@@ -330,10 +407,10 @@ def review_crawler(category:str, type:str,
             prod_dict["name"] = name
         if lowest_price != -1:
             prod_dict["lowest_price"] = lowest_price        
-        
-        
-        # 제품 상세 보러가기
+                
+        # 제품 상세 보러가기        
         floating_tabs = naver_shopping_driver.wait_until_by_xpath(10, ".//div[contains(@class, 'floatingTab_detail_tab')]")                
+        
         tabs = floating_tabs.find_elements(By.XPATH, ".//li")
         product_details = None
         review_tab = None
@@ -365,31 +442,52 @@ def review_crawler(category:str, type:str,
         except:
             log.warning("[WARNING] No see more button.")
         
-        # 제품 상세에서 ocr 및 location 따기
-        naver_spec, seller_spec, img_urls = fetch_product_spec(naver_shopping_driver)
-
-        if not naver_spec:
-            naver_spec = fetch_spec(naver_shopping_driver)            
         
-        log.info(f"[INFO] Spec: {naver_spec}")
-        prod_dict["naver_spec"] = naver_spec  
-        prod_dict["seller_spec"] = seller_spec
-        prod_dict["detail_image_urls"] = img_urls
+        
+        
+        
+        ## [SPEC]
+        
+        # 제품 상세에서 ocr 및 location 따기                
+        # naver_spec, seller_spec, img_urls = get_product_spec(naver_shopping_driver)
+
+        # # naver_spec 없으면 더보기로 클릭해서 가져옴.
+        # if not naver_spec and seller_spec:
+        #     naver_spec = fetch_spec(naver_shopping_driver)            
+        
+        # # seller_spec (image_spec 없으면 바로 다음 제품.)
+        # if not seller_spec:
+        #     log.info(f"[WARNING] No seller spec in {name}. Go to next product.")
+        #     continue
+        
+        # if for_local_test and seller_spec:
+        #     if not os.path.exists(f"./{json_save_fp}/{start_date}_{category}_ocr"):
+        #         os.makedirs(f"./{json_save_fp}/{start_date}_{category}_ocr")
+        #     current_time = datetime.datetime.now().strftime("%Y%m%d_%Hh%Mm%Ss")        
+        #     with open(f"./{json_save_fp}/{start_date}_{category}_ocr/{current_time}_{prod_dict['prid']}.json", 'w', encoding='utf-8-sig') as json_file:                                                         
+        #         json.dump(seller_spec, json_file, ensure_ascii=False, indent=4)            
+            
+                
+        # log.info(f"[INFO] Spec: {naver_spec}")
+        # prod_dict["naver_spec"] = naver_spec  
+        # prod_dict["seller_spec"] = seller_spec
+        # prod_dict["detail_image_urls"] = img_urls
 
         # fetch product detail
-        res_text, res_code = route_handler.update_product_detail_one(data=prod_dict)      
-        log.info(f"[INFO] {name} product detail updated. Response: {res_text}, Code: {res_code}")
+        # if not for_local_test:
+        #     res_text, res_code = route_handler.update_product_detail_one(data=prod_dict)      
+        #     log.info(f"[INFO] {name} product detail updated. Response: {res_text}, Code: {res_code}")
 
         # 리뷰 크롤링하기.
         review_filters = naver_shopping_driver.driver.find_elements(By.XPATH, ".//ul[contains(@class, 'filter_top_list_')]/li")
         review_filters.pop(0) # 필터 중 전체 별점 제거.
-        
         # 필요 없는 log 제거.
         naver_shopping_driver.flush_log()
         
         # 리뷰가 없는 제품인 경우. 스킵함.
         try:
-            sort_by_recent = naver_shopping_driver.wait_until_by_xpath(3, ".//a[contains(@class, 'filter_sort') and contains(@data-nclick, 'rec')]") # recent라는 뜻임.
+            # sort_by_recent = naver_shopping_driver.wait_until_by_xpath(3, ".//a[contains(@class, 'filter_sort') and contains(@data-nclick, 'rec')]") # 과거임.
+            sort_by_recent = naver_shopping_driver.wait_until_by_xpath(3, ".//a[contains(@class, 'filter_sort') and contains(@data-shp-area, 'rev.sort')]") # recent라는 뜻임.
         except Exception as e:
             log.warning(f"[WARNING] No Reviews in {name}. Go to next product.")
             continue
@@ -398,7 +496,8 @@ def review_crawler(category:str, type:str,
         current_review_filter_score = review_filters[0].text.split(" ")[0] # 초기값은 첫번째 필터의 "n점"
         current_page_num = 1
         retry_count = 0
-
+        
+        
         review_crawling_done = False
         while not review_crawling_done:
             if retry_count > 3:
@@ -417,9 +516,8 @@ def review_crawler(category:str, type:str,
                 if not flag_until_banned_review_filter:
                     continue                
 
-                naver_shopping_driver.move_to_element(element=sort_by_recent) # just move to sort_by_recent. Not crawling with sort_by_recent.
-
                 # click하고 밴 체크 -> 동일한 패턴임.
+                naver_shopping_driver.move_to_element(review_filter)
                 review_filter.click()
                 time.sleep(random.randint(4,8)*0.5)
                 if is_banned(naver_shopping_driver):
@@ -427,20 +525,33 @@ def review_crawler(category:str, type:str,
 
                 current_review_filter_score = review_filter.text.split(" ")[0]
                 is_last_page = False
+                
                 # 100개 이상이면 리뷰가 없음.
                 while (not is_last_page 
                     and current_page_num < 102 # prevent while infinite loop.
                     ): 
                     review_section = naver_shopping_driver.driver.find_element(By.XPATH, ".//div[contains(@class, 'review_section_review')]")
-                    review_pages = review_section.find_elements(By.XPATH, ".//div[contains(@class, 'pagination_pagination')]/a")        
-                    
+                    review_pages = review_section.find_elements(By.XPATH, ".//div[contains(@class, 'pagination_pagination')]/a")                            
+
                     if not review_pages: # 리뷰 자체가 한 페이지면 리뷰 로그 얻고 종료.
-                        is_last_page = True
-                        upsert_review(naver_shopping_driver, prid=prod_dict['prid'], match_nv_mid=prod_dict.get('match_nv_mid'), s_category=category, type=type)                    
+                        is_last_page = True                           
+                                                             
+                        upsert_review(
+                            naver_shopping_driver, 
+                            prid=prod_dict['prid'], 
+                            match_nv_mid=prod_dict.get('match_nv_mid'), 
+                            s_category=category, type=type,
+                            for_local_test=for_local_test
+                            )        
+                                    
                         continue
 
                     if 'next' not in review_pages[-1].get_attribute('class'): # next라는게 없을 때까지 -> 리뷰의 끝까지.
                         is_last_page = True
+
+                    
+                    if for_local_test and current_page_num > 2:
+                        break    
 
                     for review_page in review_pages:
                         # move_to_marker = review_section.find_elements(By.XPATH, ".//div[contains(@class, 'reviewItems_btn_area')]")[-1]
@@ -448,7 +559,7 @@ def review_crawler(category:str, type:str,
                         if is_banned(naver_shopping_driver):
                             is_last_page = True
                             break
-
+                        
                         is_current_page = 'now' in review_page.get_attribute('class')
                         is_prev_pages_button = 'prev' in review_page.get_attribute('class')
                         
@@ -456,7 +567,16 @@ def review_crawler(category:str, type:str,
                             continue
                         elif is_current_page:
                             current_page_num+=1
-                            upsert_review(naver_shopping_driver, prid=prod_dict['prid'], match_nv_mid=prod_dict.get('match_nv_mid'), s_category=category, type=type)                    
+                            if for_local_test and current_page_num > 2:
+                                break
+                                                                               
+                            upsert_review(
+                                naver_shopping_driver, 
+                                prid=prod_dict['prid'], 
+                                match_nv_mid=prod_dict.get('match_nv_mid'), 
+                                s_category=category, type=type,
+                                for_local_test=for_local_test
+                                )       
                             continue
                         
                         if not flag_until_banned_page_num and '다음' in review_page.text:
@@ -482,36 +602,62 @@ def review_crawler(category:str, type:str,
                             break
                         except:
                             pass
-                        time.sleep(random.randint(4,8)*0.5)                                    
-                        upsert_review(naver_shopping_driver, prid=prod_dict['prid'], match_nv_mid=prod_dict.get('match_nv_mid'), s_category=category, type=type)                                       
+                        time.sleep(random.randint(4,8)*0.5)        
+                        if for_local_test and current_page_num > 2:
+                            break    
+                                                                                      
+                        upsert_review(
+                            naver_shopping_driver, 
+                            prid=prod_dict['prid'], 
+                            match_nv_mid=prod_dict.get('match_nv_mid'), 
+                            s_category=category, type=type,
+                            for_local_test=for_local_test
+                            )       
                         current_page_num+=1
-
-            
+                
             review_crawling_done = True
         
         log.info(f"[SUCCESS] {name} crawled complete.")
+        
 
 
     naver_shopping_driver.release()
 
 
 if __name__ == '__main__':    
-    parser = ArgumentParser(description='Review crawler for naver shopping. Enter the category.')
-    parser.add_argument('--category', type=str, help='Enter the category you want to crawl.', default="keyboard")
-    parser.add_argument('--headless', type=bool, help='Set headless mode.', default=False)
-    parser.add_argument('--use_proxy', type=bool, help='Set use proxy ip.', default=False)
-    parser.add_argument('--active_user_agent', type=bool, help='Active user agent.', default=False)
-    parser.add_argument('--type', type=str, help='Enter the type.', default="R0")
+    # for category in ["tv"]:
+    for category in ["extra_battery"]:    
+                
+        parser = ArgumentParser(description='Review crawler for naver shopping. Enter the category.')
+        parser.add_argument('--category', type=str, help='Enter the category you want to crawl.', default=category)
+        parser.add_argument('--headless', type=bool, help='Set headless mode.', default=False)
+        parser.add_argument('--use_proxy', type=bool, help='Set use proxy ip.', default=False)
+        parser.add_argument('--active_user_agent', type=bool, help='Active user agent.', default=False)
+        parser.add_argument('--type', type=str, help='Enter the type.', default="R0")    
+        parser.add_argument('--for_local_test', type=bool, help='Is for crawl data locally, or crawl data for service', default=True)    
+        
+        args = parser.parse_args()
 
-    args = parser.parse_args()
-
-    log.info(f"[INFO] Start crawling at {args.category}")
-    log.info(f"[INFO] Headless: {args.headless}, Use proxy: {args.use_proxy}, Active user agent: {args.active_user_agent}")
-    review_crawler(category=args.category, headless=args.headless, 
-                         active_user_agent=args.active_user_agent, 
-                         use_proxy=args.use_proxy,
-                         type=args.type)    
-    log.info(f"[SUCCESS] Success at {args.category}")
+        log.info(f"[INFO] Start crawling at {args.category}")
+        log.info(f"[INFO] Headless: {args.headless}, Use proxy: {args.use_proxy}, Active user agent: {args.active_user_agent}")
+        
+        global start_date, json_save_fp
+        if args.for_local_test:
+            json_save_fp = f"./crawled_data"
+            if not os.path.exists(f"./{json_save_fp}"):
+                os.makedirs(f"./{json_save_fp}")
+    
+        start_date = datetime.datetime.now().strftime("%Y%m%d")            
+        
+        review_crawler(
+            category=args.category, 
+            headless=args.headless, 
+            active_user_agent=args.active_user_agent, 
+            use_proxy=args.use_proxy,
+            type=args.type,
+            for_local_test=args.for_local_test
+            )    
+        log.info(f"[SUCCESS] Success at {args.category}")
     
     
 

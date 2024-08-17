@@ -1,7 +1,8 @@
 import requests
 from log import Logger
-from settings import STAGE, URL
+from settings import STAGE, URL, REVIEW_URL
 from typing import List, Dict
+import json
 
 log = Logger.get_instance()
 DEBUG = True
@@ -71,13 +72,29 @@ def get_request(url, data, timeout=1):
 
 class RouteHandler:
     _stage = STAGE
-    def __init__(self) -> None:                
-        self._url = URL        
+    
+    def __init__(self) -> None:                                
+        log.info(f'[INFO] RouteHandler initialized. STAGE: {self.__class__._stage}')
+        if self.__class__._stage == 'prod':
+            log.info(f"[INFO] Production mode...")                    
+            self._url = URL
+            log.info(f"[INFO] URL: {self._url}")            
+            self._review_url = REVIEW_URL
+            log.info(f"[INFO] REVIEW_URL: {self._review_url}")            
+        elif self.__class__._stage == 'local':
+            log.info(f"[INFO] Local mode...")
+            self._url = URL
+            log.info(f"[INFO] URL: {self._url}")            
+            self._review_url = REVIEW_URL
+            log.info(f"[INFO] REVIEW_URL: {self._review_url}")
+        else:
+            log.warning(f"[WARNING] ELSE mode...")
+            self._url = URL
+            self._review_url = REVIEW_URL
         
     def get_ip(self, unused=True):
         res = get_request(url=f'{self._url}/ip?unused={unused}', data=None, timeout=1)        
-        return res
-        
+        return res        
     
     def upsert_ip(self, data):
         res_text, res_code = post_request(f'{self._url}/ip', data)
@@ -106,13 +123,13 @@ class RouteHandler:
         elif s_category and isinstance(s_category, str):
             suffix_url += f'?s_category={s_category}&'
         suffix_url = suffix_url.rstrip('&')
-        res = get_request(url=f"{url}{suffix_url}", data=None, timeout=3)
+        res = get_request(url=f"{url}{suffix_url}", data=None, timeout=10)
         
         return res
         
     
     def upsert_product_match(self, data:Dict): # First result at crawling.
-        res_text, res_code = post_request(f'{self._url}/product/match', data, timeout=5)
+        res_text, res_code = post_request(f'{self._url}/product/match', data, timeout=30)
         if res_code == 400:
             log.info(f'[ERROR] {res_text}, data: {data}')
         return res_text, res_code
@@ -168,7 +185,7 @@ class RouteHandler:
         if m_cateogry and isinstance(m_cateogry, str):
             suffix_url += f'?m_cateogry={m_cateogry}&'
         suffix_url = suffix_url.rstrip('&')            
-        res = get_request(url=f'{url}{suffix_url}', data=None, timeout=1)
+        res = get_request(url=f'{url}{suffix_url}', data=None, timeout=5)
         
         return res
         
@@ -195,7 +212,7 @@ class RouteHandler:
         prid: query string
         reid: query string
         """
-        url = f'{self._url}/category'
+        url = f'{self._url}/review'
         suffix_url = ''        
         suffix_url += f'/{caid}'
         if prid and isinstance(prid, str):
@@ -206,20 +223,42 @@ class RouteHandler:
         res = get_request(url=f'{url}{suffix_url}', data=None, timeout=3)
         
         return res
+    
+    def check_if_need_update(self, data:Dict)-> List:
+        """
+        check if need to update review data
+
+        Args:
+            data (Dict): id to aida_modify_time
+        """
+        url = f'{self._url}/review/need_update'
+        
+        assert isinstance(data, dict), f'[ERROR] data should be dict. data: {data}'        
+        
+        res_text, res_code = post_request(url, data, timeout=3)
+        log.info(f'[INFO] res_text: {res_code}')
+        return json.loads(res_text)
+        
         
     
     def upsert_review_batch(self, data):
         """
-        data: List of review packet
-        [
-            {            
+        data: dict of  packet
+        {
+            'type': type,
+            'category': s_category,
+            'prid': prid,
+            'match_nv_mid': match_nv_mid,        
+            'reviews': [{            
             "content": "string",
             ...
             },
-            ...
-        ]
+            ...,            
+            ]
+        }
         """
-        res_text, res_code = post_request(f'{self._url}/review', data, timeout=1000)
+        
+        res_text, res_code = post_request(f'{self._review_url}', data, timeout=1000)        
         if res_code == 400:
             log.info(f'[ERROR] {res_text}, data: {data}')
             
