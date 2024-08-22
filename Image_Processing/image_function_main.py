@@ -187,6 +187,28 @@ def make_ocr_sequence(image_path, cut_pix_list, width_threshold=150, height_thre
     image_path: img tag src attribute. e.g link of img.
 
     cut_pix_list: sorted cutline list.
+    
+    [
+        {
+            img_str: 기존 전체,
+            "our_topics": [토픽],
+            "bbox_text": [
+                {
+                "text": "",
+                "bbox": [
+                    [],[],[]
+                    ]
+                },
+                {
+                "text": "",
+                "bbox": [
+                    [],[],[]
+                    ]
+                },
+            ]
+        }
+    ]
+    
     """
     ocr_sequence = []
     # 이미지 로드
@@ -196,17 +218,22 @@ def make_ocr_sequence(image_path, cut_pix_list, width_threshold=150, height_thre
     else:
         image = Image.open(image_path)
 
-    width = image.size[0]   # 이미지 가로
+    width = image.size[0]   # 이미지 가로        
+    
+    img_dict = {
+        "img_str": "",
+        "bbox_text": []        
+    }
     
     prev_bbox = None
-    cut_line = 0
-    image_data = []
-    json_text_list = []
+    cut_line = 0    
+    img_text_list = []               
+        
     for i in range(len(cut_pix_list)-1):
         # log.info(f"cut_line: {cut_line}")
         box = (0, cut_pix_list[i], width, cut_pix_list[i+1])
         cropped_image_arr = np.asarray(image.crop(box), dtype='uint8')
-        result = ocr_engine.ocr(cropped_image_arr, cls=True)
+        result = ocr_engine.ocr(cropped_image_arr, cls=False, bin=True, )
 
         if not result or not result[0]:
             continue                
@@ -242,28 +269,28 @@ def make_ocr_sequence(image_path, cut_pix_list, width_threshold=150, height_thre
             
             bbox = line[0]
             # Not the first line
-            if prev_bbox is not None and json_text_list:
+            if prev_bbox is not None and img_text_list:
                 over_width_threshold = bbox[0][0] - prev_bbox[2][0]  > width_threshold
                 over_height_threshold = bbox[0][1] - prev_bbox[2][1]  > height_threshold                
 
                 if (over_width_threshold or over_height_threshold):  
-                    json_text_list[-1]+=("\n")
+                    img_text_list[-1]+=("\n")
 
-            json_text_list.append(replace_text(line[1][0]))
+            img_text_list.append(replace_text(line[1][0]))
             prev_bbox = bbox            
 
         # 문자와 바운딩박스 좌표를 dict으로 묶어서 리스트에 추가
-            image_data.append({'text': replace_text(line[1][0]), "bbox":line[0]})
+            img_dict['bbox_text'].append({'text': replace_text(line[1][0]), "bbox":line[0]})
         
         cut_line += cut_pix_list[i+1] - cut_pix_list[i]
         
-    image_data.insert(0, " ".join(json_text_list))
+    img_dict['img_str'] = " ".join(img_text_list)
        
 
 
     log.info(f"[SUCCESS] OCR completed.")
 
-    return image_data
+    return img_dict
 
 
 def make_ocr_sequence_json(output_path, image_path, cut_pix_list):
