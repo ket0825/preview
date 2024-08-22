@@ -27,7 +27,6 @@ from selenium.common.exceptions import TimeoutException
 
 # custom lib.
 from log import Logger 
-from image_processing.ocr_engine import OCREngine
 from image_processing.image_function_main import char_pix_extract, make_ocr_sequence
 from route_handler.route_handler import RouteHandler
 
@@ -49,9 +48,14 @@ def get_links(path:str) -> list:
         return links, product_names, category, match_nv_mids
 
 
-def ocr_function(src):
-    cut_pix_list = char_pix_extract(src)    
-    return make_ocr_sequence(src, cut_pix_list, width_threshold=150, height_threshold=100)
+def ocr_function(src: str) -> Dict:
+    try:
+        cut_pix_list = char_pix_extract(src)            
+        # TODO: multiprocessing.
+        return make_ocr_sequence(src, cut_pix_list, width_threshold=150, height_threshold=100)
+    except Exception as e:
+        log.warning(f"[WARNING] OCR failed. {e}")
+        return {}
 
 def fetch_product_detail(driver: Driver):
     top_info = driver.driver.find_elements(By.XPATH, ".//div[contains(@class, 'top_info_inner_')]")[0]
@@ -218,9 +222,8 @@ def get_product_spec(driver:Driver):
 
 def review_formatter(reviews:list[dict]) -> None:
     # remain_key = ['id', 'content', 'aidaModifyTime', 'mallId', 'mallSeq', 'matchNvMid', 'qualityScore', 'starScore', 'topicCount', "topicYn", 'topics', 'userId', 'mallName']    
-    keys_to_remove = ["aidaCreateTime", "esModifyTime", "modifyDate", "pageUrl", "registerDate", "imageCount", "imageYn", "images", "mallProductId", "mallReviewId", "rankScore", "title", "videoCount", "videoYn", "videos", "mallLogoUrl"]
-    
-    
+    keys_to_remove = ["aidaCreateTime", "esModifyTime", "modifyDate", "pageUrl", "registerDate", "imageCount", "imageYn", "images", "mallProductId", "mallReviewId", "rankScore", "title", "videoCount", "videoYn", "videos", "mallLogoUrl"]        
+    # topics 관련 제거 예정 .
     
     for review in reviews:        
         for key in keys_to_remove:
@@ -449,34 +452,34 @@ def review_crawler(
         ## [SPEC]
         
         # 제품 상세에서 ocr 및 location 따기                
-        # naver_spec, seller_spec, img_urls = get_product_spec(naver_shopping_driver)
+        naver_spec, seller_spec, img_urls = get_product_spec(naver_shopping_driver)
 
-        # # naver_spec 없으면 더보기로 클릭해서 가져옴.
-        # if not naver_spec and seller_spec:
-        #     naver_spec = fetch_spec(naver_shopping_driver)            
+        # naver_spec 없으면 더보기로 클릭해서 가져옴.
+        if not naver_spec and seller_spec:
+            naver_spec = fetch_spec(naver_shopping_driver)            
         
-        # # seller_spec (image_spec 없으면 바로 다음 제품.)
-        # if not seller_spec:
-        #     log.info(f"[WARNING] No seller spec in {name}. Go to next product.")
-        #     continue
+        # seller_spec (image_spec 없으면 바로 다음 제품.)z
+        if not seller_spec:
+            log.info(f"[WARNING] No seller spec in {name}. Go to next product.")
+            continue
         
-        # if for_local_test and seller_spec:
-        #     if not os.path.exists(f"./{json_save_fp}/{start_date}_{category}_ocr"):
-        #         os.makedirs(f"./{json_save_fp}/{start_date}_{category}_ocr")
-        #     current_time = datetime.datetime.now().strftime("%Y%m%d_%Hh%Mm%Ss")        
-        #     with open(f"./{json_save_fp}/{start_date}_{category}_ocr/{current_time}_{prod_dict['prid']}.json", 'w', encoding='utf-8-sig') as json_file:                                                         
-        #         json.dump(seller_spec, json_file, ensure_ascii=False, indent=4)            
+        if for_local_test and seller_spec:
+            if not os.path.exists(f"./{json_save_fp}/{start_date}_{category}_ocr"):
+                os.makedirs(f"./{json_save_fp}/{start_date}_{category}_ocr")
+            current_time = datetime.datetime.now().strftime("%Y%m%d_%Hh%Mm%Ss")        
+            with open(f"./{json_save_fp}/{start_date}_{category}_ocr/{current_time}_{prod_dict['prid']}.json", 'w', encoding='utf-8-sig') as json_file:                                                         
+                json.dump(seller_spec, json_file, ensure_ascii=False, indent=4)            
             
                 
-        # log.info(f"[INFO] Spec: {naver_spec}")
-        # prod_dict["naver_spec"] = naver_spec  
-        # prod_dict["seller_spec"] = seller_spec
-        # prod_dict["detail_image_urls"] = img_urls
+        log.info(f"[INFO] Spec: {naver_spec}")
+        prod_dict["naver_spec"] = naver_spec  
+        prod_dict["seller_spec"] = seller_spec
+        prod_dict["detail_image_urls"] = img_urls
 
-        # fetch product detail
-        # if not for_local_test:
-        #     res_text, res_code = route_handler.update_product_detail_one(data=prod_dict)      
-        #     log.info(f"[INFO] {name} product detail updated. Response: {res_text}, Code: {res_code}")
+        ## fetch product detail
+        if not for_local_test:
+            res_text, res_code = route_handler.update_product_detail_one(data=prod_dict)      
+            log.info(f"[INFO] {name} product detail updated. Response: {res_text}, Code: {res_code}")
 
         # 리뷰 크롤링하기.
         review_filters = naver_shopping_driver.driver.find_elements(By.XPATH, ".//ul[contains(@class, 'filter_top_list_')]/li")
@@ -634,7 +637,7 @@ if __name__ == '__main__':
         parser.add_argument('--use_proxy', type=bool, help='Set use proxy ip.', default=False)
         parser.add_argument('--active_user_agent', type=bool, help='Active user agent.', default=False)
         parser.add_argument('--type', type=str, help='Enter the type.', default="R0")    
-        parser.add_argument('--for_local_test', type=bool, help='Is for crawl data locally, or crawl data for service', default=True)    
+        parser.add_argument('--for_local_test', type=bool, help='Is for crawl data locally, or crawl data for service', default=False)    
         
         args = parser.parse_args()
 

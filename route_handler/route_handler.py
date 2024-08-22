@@ -123,7 +123,7 @@ class RouteHandler:
         elif s_category and isinstance(s_category, str):
             suffix_url += f'?s_category={s_category}&'
         suffix_url = suffix_url.rstrip('&')
-        res = get_request(url=f"{url}{suffix_url}", data=None, timeout=10)
+        res = get_request(url=f"{url}{suffix_url}", data=None, timeout=100)
         
         return res
         
@@ -141,6 +141,15 @@ class RouteHandler:
             "name": "string",
             "url": "string",
             "lowest_price": "string",
+            review_count
+            match_nv_mid
+            #
+            "brand": "string",
+            "maker": "string",
+            "naver_spec": JSON,
+            "seller_spec": JSON,
+            #
+            detail_image_urls
             ...
         }
         """
