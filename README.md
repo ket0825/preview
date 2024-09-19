@@ -4,7 +4,6 @@
 - Honeycomb과 결합하여 작동합니다 (https://github.com/ket0825/honeycomb)
 ---------------
 
-
 ## 구성요소
 ### Driver
 - 프록시 IP가 있다면 사용할 수 있습니다
@@ -51,6 +50,14 @@
 ### Dockerfile (product_link_crawler.py만 가능합니다) 
 ---------------------------------
 
+## Sequence Diagram
+### product_link_crawler.py
+![image](https://github.com/user-attachments/assets/14dec99e-9425-4a04-8fb2-233fb684814d)
+
+### review_crawler.py
+![image](https://github.com/user-attachments/assets/074d907f-4167-4bf0-8c81-0e243ae62ec5)
+
+------------------------------
 
 
 # Preview (Product review) project
