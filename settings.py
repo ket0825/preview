@@ -15,4 +15,5 @@ elif STAGE == 'dev':
 elif STAGE == 'prod':
     URL = os.getenv('PROD_URL')
     REVIEW_URL = os.getenv('PROD_REVIEW_URL')
+    OCR_URL = os.getenv('PROD_OCR_URL')
     

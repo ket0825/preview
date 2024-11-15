@@ -1,6 +1,6 @@
 import requests
 from log import Logger
-from settings import STAGE, URL, REVIEW_URL
+from settings import STAGE, URL, REVIEW_URL, OCR_URL
 from typing import List, Dict
 import json
 
@@ -45,6 +45,10 @@ def post_request(url, data, timeout=1):
         except requests.exceptions.RequestException as e:
             log.error(f'[ERROR] Error at {url}.\nError log: {e}')
             return None, None
+        except Exception as e: # Response is not json
+            log.error(f'[ERROR] Error at {url}.\nError log: {res}')
+            retry_count += 1
+            return None
     
     log.info(f'[ERROR] Could not post request at {url}. Retry count: {retry_count}')
     return None, None
@@ -65,9 +69,14 @@ def get_request(url, data, timeout=1):
             retry_count += 1
         except requests.exceptions.RequestException as e:
             log.error(f'[ERROR] Error at {url}.\nError log: {e}')
+            retry_count += 1
+            return None
+        except Exception as e: # Response is not json
+            log.error(f'[ERROR] Error at {url}.\nError log: {res}')
+            retry_count += 1
             return None
         
-        log.info(f'[ERROR] Could not post request at {url}. Retry count: {retry_count}')
+    log.info(f'[ERROR] Could not post request at {url}. Retry count: {retry_count}')
     return None
 
 class RouteHandler:
@@ -81,6 +90,8 @@ class RouteHandler:
             log.info(f"[INFO] URL: {self._url}")            
             self._review_url = REVIEW_URL
             log.info(f"[INFO] REVIEW_URL: {self._review_url}")            
+            self._ocr_url = OCR_URL
+            log.info(f"[INFO] OCR_URL: {self._ocr_url}")
         elif self.__class__._stage == 'local':
             log.info(f"[INFO] Local mode...")
             self._url = URL
@@ -123,7 +134,7 @@ class RouteHandler:
         elif s_category and isinstance(s_category, str):
             suffix_url += f'?s_category={s_category}&'
         suffix_url = suffix_url.rstrip('&')
-        res = get_request(url=f"{url}{suffix_url}", data=None, timeout=10)
+        res = get_request(url=f"{url}{suffix_url}", data=None, timeout=100)
         
         return res
         
@@ -141,10 +152,19 @@ class RouteHandler:
             "name": "string",
             "url": "string",
             "lowest_price": "string",
+            review_count
+            match_nv_mid
+            #
+            "brand": "string",
+            "maker": "string",
+            "naver_spec": JSON,
+            "seller_spec": JSON,
+            #
+            detail_image_urls
             ...
         }
         """
-        res_text, res_code = post_request(f'{self._url}/product/detail/one', data=data, timeout=10)
+        res_text, res_code = post_request(f'{self._ocr_url}', data=data, timeout=10)
         if res_code == 400:
             log.info(f'[ERROR] {res_text}, data: {data}')
 
