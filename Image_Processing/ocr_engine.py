@@ -1,7 +1,11 @@
 from paddleocr import PaddleOCR
+from log import Logger
+
+log = Logger.get_instance()
 
 class OCREngine:
-    _instance = None
+    _instance = None    
+    
     
     # singleton: 한번 만든 객체를 다시 재사용하게...
     @classmethod
@@ -11,7 +15,11 @@ class OCREngine:
         return cls._instance
     
 
-    # for multi worker.
-    # @staticmethod
-    # def get_instance():
-    #     return PaddleOCR(lang="korean")
+    # for multi worker           
+    
+    @staticmethod
+    def factory(id, **kwargs):
+        log.info(f"OCR Engine {id} is created")                
+        return PaddleOCR(lang="korean", **kwargs)
+    
+    
