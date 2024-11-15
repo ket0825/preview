@@ -56,10 +56,13 @@ class Driver:
         self._ip_obj = {}
         self._route_handler = RouteHandler()                             
         options = self.set_options(headless, active_user_agent, use_proxy, get_log)
+        
         self.driver = webdriver.Chrome(
-            service=ChromeService(ChromeDriverManager(driver_version="126.0.6478.115").install()),
-                                       options=options,
-                                       )
+            service=ChromeService(
+                executable_path=ChromeDriverManager().install().replace("THIRD_PARTY_NOTICES.chromedriver", "chromedriver.exe")
+                ),
+            options=options,
+            )
         # save options
         self.headless = headless
         self.active_user_agent=  active_user_agent
@@ -217,11 +220,11 @@ class Driver:
             self.release()
 
 
-if __name__ == '__main__':
+if __name__ == '__main__':    
     driver = Driver(headless=False, active_user_agent=True, use_proxy=True, get_log=False)
-    # driver.proxy_check()
-    # driver.release()
-    driver.get_url_by_category('smartwatch')
-    driver.set_ip_dirty()
-    driver.get_url_by_category('keyboard')
+    # # driver.proxy_check()
     driver.release()
+    # driver.get_url_by_category('smartwatch')
+    # driver.set_ip_dirty()
+    # driver.get_url_by_category('keyboard')
+    # driver.release()
