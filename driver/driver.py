@@ -109,6 +109,7 @@ class Driver:
             "webrtc.ip_handling_policy" : "disable_non_proxied_udp", # prevent IP leak issues.
             "webrtc.multiple_routes_enabled": False, # prevent IP leak issues.
             "webrtc.nonproxied_udp_enabled" : False, # prevent IP leak issues.
+            "profile.managed_default_content_settings.images": 2  # 2는 이미지 비활성화. 이미지는 url로 처리.
             # "profile.default_content_setting_values.cookies": 2
         }
         options.add_experimental_option("excludeSwitches", ["enable-automation"]) # automation message exclude.
