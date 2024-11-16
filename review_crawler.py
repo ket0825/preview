@@ -441,6 +441,16 @@ def log_filter(log_):
 global total_reviews
 total_reviews = []
 
+def clear_callback(future):
+    global total_reviews
+    try:
+        res_text, res_code = future.result()
+        log.info(f"Response: {res_text}, Code: {res_code}")
+        total_reviews.clear()  # 작업 완료 후 clear
+    except Exception as e:
+        log.error(f"Error in callback: {e}")
+    
+
 def upsert_review(
     naver_shopping_driver: Driver, 
     prid:str, 
@@ -472,9 +482,10 @@ def upsert_review(
             }    
             
             accept_ids = route_handler.check_if_need_update(ids_to_time)
-            print(f"accept_ids: {accept_ids}")
+            log.info(f"accept_ids: {accept_ids}")
             reviews = [review for review in reviews if review['id'] in accept_ids]
-            
+            if reviews:
+                log.info(f"reviews[0]: {reviews[0]}")
             total_reviews.extend(reviews)
 
     
@@ -503,10 +514,8 @@ def upsert_review(
             future = executor.submit(route_handler.upsert_review_batch, payload)
             # res_text, res_code = route_handler.upsert_review_batch(payload)
             # log.info(f"[INFO] {res_text}, {res_code}")
-            future.add_done_callback(lambda future: log.info(f"[INFO] {future.result()}"))
-            # return {"text": res_text, "code": res_code}
-            
-        total_reviews.clear()
+            future.add_done_callback(clear_callback)
+            # return {"text": res_text, "code": res_code}        
         
 
 def review_crawler(
