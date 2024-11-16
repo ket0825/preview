@@ -56,13 +56,14 @@ class Driver:
         self._ip_obj = {}
         self._route_handler = RouteHandler()                             
         options = self.set_options(headless, active_user_agent, use_proxy, get_log)
-        
+        driver_path = ChromeDriverManager().install()
+        correct_driver_path = os.path.join(os.path.dirname(driver_path), "chromedriver.exe") # TODO: Check linux compatibility 
         self.driver = webdriver.Chrome(
             service=ChromeService(
-                executable_path=ChromeDriverManager().install().replace("THIRD_PARTY_NOTICES.chromedriver", "chromedriver.exe")
+                    correct_driver_path
                 ),
-            options=options,
-            )
+                options=options,
+        )
         # save options
         self.headless = headless
         self.active_user_agent=  active_user_agent
