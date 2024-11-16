@@ -16,7 +16,9 @@ import os
 from shutil import rmtree
 from argparse import ArgumentParser
 from concurrent.futures import ThreadPoolExecutor
+
 import multiprocessing as mp
+import traceback
 
 from queue import Empty, Full
 
@@ -278,8 +280,10 @@ def get_image_specs(driver:Driver, xpath, max_ocr_workers=3):
     """
     # multiprocessing 한계: 여러 개의 프로세스에서 Queue로 공유할 수 있으려면 pickleable 해야 함. PaddleOCR은 그렇지 않음.
     
-    
+    time.sleep(3)
     web_elements = driver.driver.find_elements(By.XPATH, xpath)
+    # wait_located_list_until_by_xpath을 사용하면 없는 경우에 exception을 발생시켜 문제가 발생함.
+    
     image_urls = [] # img_urls
     seller_spec = []
     
@@ -291,7 +295,7 @@ def get_image_specs(driver:Driver, xpath, max_ocr_workers=3):
         time.sleep(0.5)
     
     # .gif, 동영상 등의 확장자를 막기 위함.
-    img_ocr_list = [(img_ord, image_url) for img_ord, image_url in enumerate(image_urls) if '.jpg' in image_url or '.png' in image_url]  # ocr queue에 넣을 이미지 리스트.        
+    img_ocr_list = [(img_ord, image_url) for img_ord, image_url in enumerate(image_urls) if '.jpg' in image_url or '.png' in image_url or ".jpeg" in image_url]  # ocr queue에 넣을 이미지 리스트.        
     
     if not img_ocr_list:
         log.info(f"[WARNING] There is no image to OCR.")
@@ -346,10 +350,11 @@ def get_image_specs(driver:Driver, xpath, max_ocr_workers=3):
 # TODO: later, it should be an mp.
 def get_product_spec(driver:Driver, max_ocr_workers=4):
     try:
+        # 제품정보 섹션 찾기
         spec_info_section = driver.driver.find_element(By.XPATH, ".//h3[contains(@class, 'specInfo_section_title__')]")    
         driver.move_to_element(element=spec_info_section)
     except:
-        log.info(f"[WARNING] There is no product details.")
+        log.info(f"[WARNING] There is no product sections.")
         return {}, [], []
 
     # html tag에 height가 있는데...?
@@ -357,12 +362,12 @@ def get_product_spec(driver:Driver, max_ocr_workers=4):
     seller_spec =  []
     img_urls = []
     
-    # 본 컨텐츠는 ... 부분 위치.
+    # 본 컨텐츠는 ...에서 제공받은 정보입니다. 부분
     try:
-        driver.wait_until_by_xpath(3, ".//p[contains(@class, 'imageSpecInfo_provide_')]")
+        driver.wait_until_by_xpath(5, ".//p[contains(@class, 'imageSpecInfo_provide_')]")
     except:
         try:
-            driver.wait_until_by_xpath(3, ".//p[contains(@class, 'specInfo_provide_')]") # 이미지 스펙 없는 경우.
+            driver.wait_until_by_xpath(5, ".//p[contains(@class, 'specInfo_provide_')]") # 이미지 스펙 없는 경우.
         except TimeoutException:
             log.info(f"[WARNING] There is no product details.")    
 
@@ -385,7 +390,7 @@ def get_product_spec(driver:Driver, max_ocr_workers=4):
                                             'location': [val.location['y'], val.location['x']]
                                             }
         except:
-            log.info(f"[WARNING] There is no product details.")
+            log.info(f"[WARNING] There is no product tables.")
                 
     try:
         seller_spec_payload, img_urls_payload = get_image_specs(driver, ".//p[contains(@id, 'detailFromBrand')]/img", max_ocr_workers=max_ocr_workers)
@@ -395,8 +400,8 @@ def get_product_spec(driver:Driver, max_ocr_workers=4):
         seller_spec.extend(seller_spec_payload)
         img_urls.extend(img_urls_payload)        
     except NoSuchElementException:        
-        pass
-
+        log.warning(f"[WARNING] There is no image seller_specs.")
+        
     return naver_spec, seller_spec, img_urls
 
 def review_formatter(reviews:list[dict]) -> None:
@@ -525,8 +530,9 @@ def review_crawler(
         active_user_agent=False, 
         use_proxy=False,
         for_local_test=True,
+        for_local_api_test=True,
         max_ocr_workers=4
-    ) -> None:
+    ) -> bool:
         
     naver_shopping_driver = Driver(headless=headless, active_user_agent=active_user_agent, use_proxy=use_proxy, get_log=True)        
     
@@ -550,7 +556,9 @@ def review_crawler(
     try:
         for product in products: 
             
-            # if "리큐엠" not in product['name']:
+            if "힉스코리아" not in product['name']:
+                continue
+            # if "맥세이프" in product['name']:
             #     continue
 
             prod_dict = {
@@ -651,7 +659,7 @@ def review_crawler(
             if not naver_spec and seller_spec:
                 naver_spec = fetch_spec(naver_shopping_driver)            
             
-            # seller_spec (image_spec 없으면 바로 다음 제품.)z
+            # seller_spec (image_spec 없으면 바로 다음 제품)
             if not seller_spec:
                 log.info(f"[WARNING] No seller spec in {name}. Go to next product.")
                 continue
@@ -709,6 +717,9 @@ def review_crawler(
                     # IP Blocked 시 다시 driver를 띄울 때, 리뷰 grade를 특정 수치로 설정해서 넘어가게끔 함.                                
                     if is_banned(naver_shopping_driver):
                         break
+                    # 조기 종료.
+                    if review_crawling_done:
+                        break
                     if flag_until_banned_review_filter or current_review_filter_score == review_filter.text.split(" ")[0]:
                         flag_until_banned_review_filter = True                    
                     if not flag_until_banned_review_filter:
@@ -746,10 +757,11 @@ def review_crawler(
 
                         if 'next' not in review_pages[-1].get_attribute('class'): # next라는게 없을 때까지 -> 리뷰의 끝까지.
                             is_last_page = True
-
                         
-                        if for_local_test and current_page_num > 2:
+                        if (for_local_api_test or for_local_test) and current_page_num > 2:
+                            review_crawling_done = True
                             break    
+                        
 
                         for review_page in review_pages:
                             # move_to_marker = review_section.find_elements(By.XPATH, ".//div[contains(@class, 'reviewItems_btn_area')]")[-1]
@@ -765,8 +777,9 @@ def review_crawler(
                                 continue
                             elif is_current_page:
                                 current_page_num+=1
-                                if for_local_test and current_page_num > 2:
-                                    break
+                                if (for_local_api_test or for_local_test) and current_page_num > 2:
+                                    review_crawling_done = True
+                                    break                                
                                                                                 
                                 upsert_review(
                                     naver_shopping_driver, 
@@ -801,7 +814,8 @@ def review_crawler(
                             except:
                                 pass
                             time.sleep(random.randint(4,8)*0.5)        
-                            if for_local_test and current_page_num > 2:
+                            if (for_local_api_test or for_local_test) and current_page_num > 2:
+                                review_crawling_done = True
                                 break    
                                                                                         
                             upsert_review(
@@ -816,8 +830,11 @@ def review_crawler(
                 review_crawling_done = True
             
             log.info(f"[SUCCESS] {name} crawled complete.")    
-    except Exception as e:
-        log.error(f"[ERROR] {e}")        
+        return True
+    except Exception:        
+        log.error(f"[ERROR] {traceback.format_exc()}")
+        return False
+                
     finally:
         naver_shopping_driver.release()
         
@@ -832,7 +849,10 @@ if __name__ == '__main__':
         parser.add_argument('--use_proxy', type=bool, help='Set use proxy ip.', default=False)
         parser.add_argument('--active_user_agent', type=bool, help='Active user agent.', default=False)
         parser.add_argument('--type', type=str, help='Enter the type.', default="R0")    
-        parser.add_argument('--for_local_test', type=bool, help='Is for crawl data locally, or crawl data for service', default=False)    
+        parser.add_argument('--for_local_test', type=bool, help='Is for crawl data locally, or crawl data for service', 
+                            default=False)    
+        parser.add_argument('--for_local_api_test', type=bool, help='Is for crawl data and local api test', 
+                            default=True)    
         
         args = parser.parse_args()
 
@@ -847,19 +867,16 @@ if __name__ == '__main__':
     
         start_date = datetime.datetime.now().strftime("%Y%m%d")
         
-        review_crawler(
+        result = review_crawler(
             category=args.category, 
             headless=args.headless, 
             active_user_agent=args.active_user_agent, 
             use_proxy=args.use_proxy,
             type=args.type,
-            for_local_test=args.for_local_test
+            for_local_test=args.for_local_test,
+            for_local_api_test=args.for_local_api_test,
             )    
-        
-        log.info(f"[SUCCESS] Success at {args.category}")
-    
-    
-
-
-
-
+        if result:
+            log.info(f"[SUCCESS] Success at {args.category}")
+        else:
+            log.error(f"[ERROR] Error at {args.category}")
