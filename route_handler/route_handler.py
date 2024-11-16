@@ -30,6 +30,10 @@ def delete_request(url, timeout=1):
 
 def post_request(url, data, timeout=1):
     retry_count = 0
+    for k, v in data.items():
+        if not v:
+            data[k] = None
+            
     if DEBUG:
         retry_count = 4
         log.info("DEBUG MODE")
@@ -97,6 +101,7 @@ class RouteHandler:
             self._url = URL
             log.info(f"[INFO] URL: {self._url}")            
             self._review_url = REVIEW_URL
+            self._ocr_url = OCR_URL
             log.info(f"[INFO] REVIEW_URL: {self._review_url}")
         else:
             log.warning(f"[WARNING] ELSE mode...")
