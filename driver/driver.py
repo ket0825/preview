@@ -1,4 +1,6 @@
 import time
+import os
+from typing import List
 
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service as ChromeService
@@ -12,6 +14,7 @@ from selenium.webdriver.remote.webelement import WebElement
 from selenium.webdriver import ActionChains
 
 from route_handler.route_handler import RouteHandler
+
 
 #TODO: proxy ip list need.
 """
@@ -171,8 +174,14 @@ class Driver:
         actions = ActionChains(self.driver)
         actions.move_to_element(element).perform()
         
+    def wait_located_list_until_by_xpath(self, time:float, value:str) -> List[WebElement]:            
+        return WebDriverWait(self.driver, time).until(EC.presence_of_all_elements_located((By.XPATH, value)))    
+    
+    def wait_located_until_by_xpath(self, time:float, value:str) -> WebElement:            
+        return WebDriverWait(self.driver, time).until(EC.presence_of_element_located((By.XPATH, value)))
+    
     def wait_until_by_xpath(self, time:float, value:str) -> WebElement:            
-        return WebDriverWait(self.driver, time).until(EC.element_to_be_clickable((By.XPATH, value)))
+        return WebDriverWait(self.driver, time).until(EC.element_to_be_clickable((By.XPATH, value)))    
     
     def screenshot_whole(self, path:str): # 미완성.
         """
@@ -222,11 +231,7 @@ class Driver:
             self.release()
 
 
-if __name__ == '__main__':    
+if __name__ == '__main__':
     driver = Driver(headless=False, active_user_agent=True, use_proxy=True, get_log=False)
-    # # driver.proxy_check()
-    driver.release()
-    # driver.get_url_by_category('smartwatch')
-    # driver.set_ip_dirty()
-    # driver.get_url_by_category('keyboard')
+    # driver.proxy_check()
     # driver.release()
