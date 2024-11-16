@@ -1,4 +1,6 @@
 import time
+import os
+from typing import List
 
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service as ChromeService
@@ -12,6 +14,7 @@ from selenium.webdriver.remote.webelement import WebElement
 from selenium.webdriver import ActionChains
 
 from route_handler.route_handler import RouteHandler
+
 
 #TODO: proxy ip list need.
 """
@@ -56,13 +59,14 @@ class Driver:
         self._ip_obj = {}
         self._route_handler = RouteHandler()                             
         options = self.set_options(headless, active_user_agent, use_proxy, get_log)
-        
+        driver_path = ChromeDriverManager().install()
+        correct_driver_path = os.path.join(os.path.dirname(driver_path), "chromedriver.exe") # TODO: Check linux compatibility 
         self.driver = webdriver.Chrome(
             service=ChromeService(
-                executable_path=ChromeDriverManager().install().replace("THIRD_PARTY_NOTICES.chromedriver", "chromedriver.exe")
+                    correct_driver_path
                 ),
-            options=options,
-            )
+                options=options,
+        )
         # save options
         self.headless = headless
         self.active_user_agent=  active_user_agent
@@ -108,6 +112,7 @@ class Driver:
             "webrtc.ip_handling_policy" : "disable_non_proxied_udp", # prevent IP leak issues.
             "webrtc.multiple_routes_enabled": False, # prevent IP leak issues.
             "webrtc.nonproxied_udp_enabled" : False, # prevent IP leak issues.
+            "profile.managed_default_content_settings.images": 2  # 2는 이미지 비활성화. 이미지는 url로 처리.
             # "profile.default_content_setting_values.cookies": 2
         }
         options.add_experimental_option("excludeSwitches", ["enable-automation"]) # automation message exclude.
@@ -169,8 +174,14 @@ class Driver:
         actions = ActionChains(self.driver)
         actions.move_to_element(element).perform()
         
+    def wait_located_list_until_by_xpath(self, time:float, value:str) -> List[WebElement]:            
+        return WebDriverWait(self.driver, time).until(EC.presence_of_all_elements_located((By.XPATH, value)))    
+    
+    def wait_located_until_by_xpath(self, time:float, value:str) -> WebElement:            
+        return WebDriverWait(self.driver, time).until(EC.presence_of_element_located((By.XPATH, value)))
+    
     def wait_until_by_xpath(self, time:float, value:str) -> WebElement:            
-        return WebDriverWait(self.driver, time).until(EC.element_to_be_clickable((By.XPATH, value)))
+        return WebDriverWait(self.driver, time).until(EC.element_to_be_clickable((By.XPATH, value)))    
     
     def screenshot_whole(self, path:str): # 미완성.
         """
@@ -220,11 +231,7 @@ class Driver:
             self.release()
 
 
-if __name__ == '__main__':    
+if __name__ == '__main__':
     driver = Driver(headless=False, active_user_agent=True, use_proxy=True, get_log=False)
-    # # driver.proxy_check()
-    driver.release()
-    # driver.get_url_by_category('smartwatch')
-    # driver.set_ip_dirty()
-    # driver.get_url_by_category('keyboard')
+    # driver.proxy_check()
     # driver.release()

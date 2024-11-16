@@ -23,6 +23,11 @@ class Logger:
         stream_handler = logging.StreamHandler() #그냥 handler는 ABC임.
         stream_handler.setFormatter(formatter)
         self.logger.addHandler(stream_handler)
+        
+        file_handler = logging.FileHandler('log.log')
+        file_handler.setFormatter(formatter)
+        self.logger.addHandler(file_handler)
+        
 
     def get_logger(self):
         return self.logger

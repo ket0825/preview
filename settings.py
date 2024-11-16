@@ -8,7 +8,8 @@ STAGE = os.getenv('STAGE') if os.getenv('STAGE') else "local"
 
 if STAGE == 'local':
     URL = os.getenv('LOCAL_URL') if os.getenv('URL') else "http://localhost:5000/api"
-    REVIEW_URL = os.getenv('LOCAL_REVIEW_URL')
+    REVIEW_URL = os.getenv('LOCAL_REVIEW_URL') if os.getenv('REVIEW_URL') else "http://localhost:5000/api/review"
+    OCR_URL = os.getenv('LOCAL_OCR_URL') if os.getenv('OCR_URL') else "http://localhost:5000/api/product/detail/one"
 elif STAGE == 'dev':
     URL = os.getenv('DEV_URL')
     REVIEW_URL = os.getenv('DEV_REVIEW_URL')
