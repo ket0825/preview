@@ -221,9 +221,11 @@ class RouteHandler:
         [
             {
             "s_category": "string",
+            "m_category": "string",
             "category_url": "string"
-            "s_topic": "string",
-            "type": "string",
+            "s_topic": "list",
+            "m_topic": "list",
+            "type": "C0",
             },
             ...
         ]
