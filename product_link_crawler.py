@@ -168,7 +168,8 @@ if __name__ == '__main__':
     for category in [
         # "tv",
                     #  "tablet",
-                     "nutritional_supplements",
+                    #  "extra_battery",
+                    "humidifier",
                      ]:
         parser = ArgumentParser(description='Product link crawler for naver shopping. Enter the category.')
         parser.add_argument('--category', type=str, help='Enter the category you want to crawl.', default=category)
@@ -188,8 +189,3 @@ if __name__ == '__main__':
                             use_proxy=args.use_proxy,
                             type=args.type, page_num=args.page_num)
         # log.info(f"[SUCCESS] Success at {args.category}")
-    
-    
-
-
-

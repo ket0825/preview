@@ -556,8 +556,8 @@ def review_crawler(
     try:
         for product in products: 
             
-            if "힉스코리아" not in product['name']:
-                continue
+            # if "힉스코리아" not in product['name']:
+            #     continue
             # if "맥세이프" in product['name']:
             #     continue
 
@@ -842,7 +842,7 @@ def review_crawler(
 
 if __name__ == '__main__':    
     # for category in ["tv"]:
-    for category in ["extra_battery"]:
+    for category in ["humidifier"]:
         parser = ArgumentParser(description='Review crawler for naver shopping. Enter the category.')
         parser.add_argument('--category', type=str, help='Enter the category you want to crawl.', default=category)
         parser.add_argument('--headless', type=bool, help='Set headless mode.', default=False)
