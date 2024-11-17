@@ -555,12 +555,6 @@ def review_crawler(
     flag = False
     try:
         for product in products: 
-            
-            # if "힉스코리아" not in product['name']:
-            #     continue
-            # if "맥세이프" in product['name']:
-            #     continue
-
             prod_dict = {
                     "grade": "",
                     "name": "",
