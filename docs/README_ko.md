@@ -4,6 +4,15 @@
 - Honeycomb과 결합하여 작동합니다 (https://github.com/ket0825/honeycomb)
 ---------------
 
+## 예시
+
+![a](https://github.com/user-attachments/assets/97f299fa-d4af-49cf-b1f7-7d3cda4c010a)
+------------
+![b](https://github.com/user-attachments/assets/d792df1d-c277-426a-8b02-d16ec92cae27)
+------------
+![c](https://github.com/user-attachments/assets/54b2d3ee-98f0-4b27-bd73-2f03634091d2)
+
+
 ## 구성요소
 ### Driver
 - 프록시 IP가 있다면 사용할 수 있습니다
